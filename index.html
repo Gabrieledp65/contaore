@@ -570,14 +570,14 @@
       <div class="sec">Orari</div>
       <div class="panel pad">
         <div class="fields">
-          <div><label class="f" for="ed-partenza">Partenza dalla sede</label><input class="inp" type="time" id="ed-partenza" oninput="edAnteprima()"></div>
-          <div><label class="f" for="ed-inizio">Inizio lavoro</label><input class="inp" type="time" id="ed-inizio" oninput="edAnteprima()"></div>
-          <div><label class="f" for="ed-fine">Fine lavoro</label><input class="inp" type="time" id="ed-fine" oninput="edAnteprima()"></div>
-          <div><label class="f" for="ed-arrivo">Rientro in sede</label><input class="inp" type="time" id="ed-arrivo" oninput="edAnteprima()"></div>
-          <div><label class="f" for="ed-pausa">Pausa (minuti)</label><input class="inp" type="number" inputmode="numeric" min="0" step="5" id="ed-pausa" placeholder="0" oninput="edAnteprima()"></div>
-          <div><label class="f" for="ed-rientro">Partenza rientro</label><input class="inp" type="time" id="ed-rientro" oninput="edAnteprima()"></div>
+          <div><label class="f" for="ed-partenza">1. Partenza dalla sede</label><input class="inp" type="time" id="ed-partenza" oninput="edAnteprima()"></div>
+          <div><label class="f" for="ed-inizio">2. Inizio lavoro</label><input class="inp" type="time" id="ed-inizio" oninput="edAnteprima()"></div>
+          <div><label class="f" for="ed-pausa">3. Pausa (minuti)</label><input class="inp" type="number" inputmode="numeric" min="0" step="5" id="ed-pausa" placeholder="0" oninput="edAnteprima()"></div>
+          <div><label class="f" for="ed-fine">4. Fine lavoro</label><input class="inp" type="time" id="ed-fine" oninput="edAnteprima()"></div>
+          <div><label class="f" for="ed-rientro">5. Partenza rientro</label><input class="inp" type="time" id="ed-rientro" oninput="edAnteprima()"></div>
+          <div><label class="f" for="ed-arrivo">6. Rientro in sede</label><input class="inp" type="time" id="ed-arrivo" oninput="edAnteprima()"></div>
         </div>
-        <p class="help">Senza trasferta bastano inizio, fine e pausa. «Partenza rientro» serve solo se diversa dalla fine del lavoro. Un orario precedente al precedente vale per il giorno dopo.</p>
+        <p class="help">Segui l'ordine della giornata: «Inizio lavoro» è l'arrivo in cantiere, «Rientro in sede» è l'ultimo orario della giornata. Senza trasferta bastano 2, 3 e 4. Il 5 serve solo se riparti più tardi della fine lavoro. Se dormi fuori lascia vuoto il 6. Un orario precedente a quello prima vale per il giorno dopo (lavoro oltre mezzanotte).</p>
         <details class="more" id="ed-override-box">
           <summary>Non ricordi gli orari? Inserisci le ore totali</summary>
           <div class="fields">
@@ -698,7 +698,7 @@
 
 <script>
   'use strict';
-  const APP_VERSION = 'v1.5';
+  const APP_VERSION = 'v1.6';
   const LS_KEY = 'segnaore_v1';
   const $ = id => document.getElementById(id);
 
@@ -1580,6 +1580,22 @@
     $('ed-ind-wrap').classList.toggle('hidden', $('ed-trasferta').value !== 'custom');
     edAnteprima();
   }
+  // Controlli di plausibilità sugli orari inseriti a mano
+  const NOMI_ORARI = { partenza: 'Partenza dalla sede', inizio: 'Inizio lavoro', fine: 'Fine lavoro', rientro: 'Partenza per il rientro', arrivo: 'Rientro in sede' };
+  function avvisiOrari(e, r) {
+    const out = [];
+    let prevK = null, prevV = null;
+    ['partenza', 'inizio', 'fine', 'rientro', 'arrivo'].forEach(k => {
+      const v = toMin(e[k]);
+      if (v == null) return;
+      if (prevV != null && v < prevV && v + 1440 - prevV > 12 * 60) out.push(`«${NOMI_ORARI[k]}» (${e[k]}) viene prima di «${NOMI_ORARI[prevK]}» (${e[prevK]}), quindi è contato come ora del giorno dopo.`);
+      prevK = k; prevV = v;
+    });
+    if (num(e.oreViaggio) == null && r.viag > 16 * 60) out.push(`Risultano ${fmtH(r.viag, 'hm')} di viaggio: controlla gli orari.`);
+    if (num(e.oreLavoro) == null && r.lav > 16 * 60) out.push(`Risultano ${fmtH(r.lav, 'hm')} di lavoro: controlla gli orari.`);
+    return out;
+  }
+
   function edAnteprima() {
     const ds = $('ed-data').value;
     if (!ds) return;
@@ -1596,7 +1612,8 @@
     if (r.str1) det.push(`lun-ven prime 2 ore ${fmtH(r.str1)}`); if (r.str2) det.push(`lun-ven oltre ${fmtH(r.str2)}`);
     if (r.sab1) det.push(`sabato prime 2 ore ${fmtH(r.sab1)}`); if (r.sab2) det.push(`sabato oltre ${fmtH(r.sab2)}`);
     if (r.strNott) det.push(`notturno ${fmtH(r.strNott)}`); if (r.fest) det.push(`festivo ${fmtH(r.fest)}`); if (r.festNott) det.push(`festivo notturno ${fmtH(r.festNott)}`);
-    $('ed-anteprima').innerHTML = `<div class="pl">${parti.map(p => `<span>${p}</span>`).join('')}</div>${det.length ? `<div class="det">Straordinario: ${det.join(', ')}</div>` : ''}${stripHTML(e, false, null)}`;
+    const av = avvisiOrari(e, r);
+    $('ed-anteprima').innerHTML = (av.length ? `<div style="background:rgba(255,107,107,.16);color:#FFB4B4;border-radius:10px;padding:9px 11px;margin-bottom:10px;font-size:13px;font-weight:600">${av.map(esc).join('<br>')}</div>` : '') + `<div class="pl">${parti.map(p => `<span>${p}</span>`).join('')}</div>${det.length ? `<div class="det">Straordinario: ${det.join(', ')}</div>` : ''}${stripHTML(e, false, null)}`;
   }
   function edSalva() {
     const ds = $('ed-data').value;
@@ -1606,7 +1623,8 @@
     if ((e.inizio && !e.fine) || (!e.inizio && e.fine)) {
       if (num(e.oreLavoro) == null && !confirm('Hai indicato solo inizio o solo fine lavoro: le ore di lavoro risulteranno 0. Salvare lo stesso?')) return;
     }
-    if (t.inizio != null && t.fine != null && t.fine - t.inizio > 20 * 60) { if (!confirm('Più di 20 ore tra inizio e fine lavoro: è corretto?')) return; }
+    const av = avvisiOrari(e, calcolaGiorno(ds, e));
+    if (av.length && !confirm('Controlla:\n\n' + av.join('\n') + '\n\nSalvare lo stesso?')) return;
     const vuoto = !e.inizio && !e.fine && !e.partenza && !e.arrivo && num(e.oreLavoro) == null && num(e.oreViaggio) == null && !e.assTipo && !e.note && !e.localita && !(num(e.km)) && e.trasferta === 'no';
     if (vuoto) { alert('Il giorno è vuoto: inserisci orari, ore o un\'assenza.'); return; }
     if (db.giorni[ds] && ds !== edOrig && !confirm(`Il ${dataIt(ds)} è già registrato. Sostituirlo?`)) return;
