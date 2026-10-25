@@ -346,7 +346,7 @@
           </div>
           <div>
             <label class="f" for="live-km">Km percorsi</label>
-            <input class="inp" id="live-km" type="number" inputmode="decimal" min="0" step="1" placeholder="0" oninput="salvaDettagliLive()">
+            <input class="inp" id="live-km" type="number" inputmode="decimal" min="0" step="1" placeholder="0" oninput="salvaDettagliLive('km')">
           </div>
           <div>
             <label class="f" for="live-trasferta">Trasferta</label>
@@ -356,6 +356,10 @@
               <option value="pernotto">Con pernotto</option>
               <option value="custom">Importo a mano</option>
             </select>
+          </div>
+          <div class="full" id="live-km-box">
+            <p class="help" id="live-km-info" style="margin-top:-4px"></p>
+            <button class="link" id="btn-km-gps" type="button" onclick="calcolaKmCantiere(true)" style="padding-left:2px"></button>
           </div>
           <div class="full hidden" id="live-ind-wrap">
             <label class="f" for="live-ind">Importo indennità (€)</label>
@@ -489,6 +493,16 @@
         <div class="full"><label class="chk"><input type="checkbox" data-imp="viaggioCopre"> Il viaggio completa prima l'orario normale</label></div>
       </div>
       <p class="help">Se l'indennità con pernotto è 0 o vuota, i giorni con pernotto prendono l'indennità giornaliera. Se attivo «il viaggio completa…»: in un giorno con 6 ore di lavoro e 3 di viaggio, 2 ore di viaggio completano le 8 ordinarie e solo 1 è pagata come viaggio. Il viaggio non fa mai scattare lo straordinario.</p>
+      <div style="border-top:1px solid var(--line);margin:16px -16px 0;padding:16px 16px 0">
+        <label class="f">Posizione della sede</label>
+        <p class="help" id="imp-sede-info" style="margin:0 2px 10px"></p>
+        <div class="g2">
+          <button class="btn sm soft-cobalt" type="button" onclick="impostaSede()" id="btn-sede"></button>
+          <button class="btn sm soft" type="button" onclick="rimuoviSede()" id="btn-sede-rimuovi">Rimuovi</button>
+        </div>
+        <label class="chk" style="margin-top:14px"><input type="checkbox" data-imp="kmAuto"> Calcola i km all'arrivo in cantiere</label>
+        <p class="help">Quando premi «Arrivato, inizio lavoro» l'app rileva la posizione e calcola i km di strada dalla sede: andata e ritorno, oppure solo andata se la trasferta è con pernotto. Senza rete usa la distanza in linea d'aria × 1,3 e la ricalcola appena torna il segnale. Percorsi: OSRM; nome della località: OpenStreetMap.</p>
+      </div>
     </div>
 
     <div class="sec">Ferie e permessi annui</div>
@@ -698,7 +712,7 @@
 
 <script>
   'use strict';
-  const APP_VERSION = 'v1.6';
+  const APP_VERSION = 'v1.7';
   const LS_KEY = 'segnaore_v1';
   const $ = id => document.getElementById(id);
 
@@ -755,7 +769,8 @@
     // CCNL Metalmeccanici Industria – lavoro non a turni (art. 7)
     mag: { str1: 25, str2: 30, sab1: 25, sab2: 50, strNott: 50, fest: 55, festNott: 75, nottOrd: 30 },
     indGiorno: 15, indPernotto: 0, euroKm: 0, viaggioPerc: 85, viaggioCopre: true,
-    ferieAnnue: 160, parAnnue: 104, dataAssunzione: '2026-09-14'
+    ferieAnnue: 160, parAnnue: 104, dataAssunzione: '2026-09-14',
+    sede: null, kmAuto: true
   };
 
   let db = caricaDb();
@@ -1217,6 +1232,7 @@
   function azione(cmd) {
     const L = live();
     const now = new Date().toISOString();
+    let gpsDopo = false;
     if (L.stato === 'PRONTO') {
       const esiste = db.giorni[oggiStr()];
       if (esiste && !confirm('Per oggi c\'è già una giornata registrata. Il cronometro la sostituirà quando chiudi. Continuare?')) return;
@@ -1224,7 +1240,7 @@
     }
     switch (cmd) {
       case 'PARTO': L.t.partenza = now; L.stato = 'ANDATA'; break;
-      case 'INIZIO': L.t.inizio = now; L.stato = 'LAVORO'; break;
+      case 'INIZIO': L.t.inizio = now; L.stato = 'LAVORO'; gpsDopo = !!L.t.partenza && imp().kmAuto !== false; break;
       case 'PAUSA': L.pausaInizio = now; L.stato = 'PAUSA'; break;
       case 'FINE_PAUSA':
         L.pausaMin += Math.max(0, Math.round((new Date() - new Date(L.pausaInizio)) / 60000));
@@ -1242,11 +1258,13 @@
       case 'NUOVA': db.live = nuovoLive(); break;
     }
     salvaDb(); renderOggi();
+    if (gpsDopo) calcolaKmCantiere(false);
   }
 
   function chiudiGiornataLive() {
     const L = live();
     L.stato = 'FINITO';
+    applicaKmAuto(L);
     const e = liveComeGiorno(L, true);
     e.fonte = 'cronometro'; e.agg = new Date().toISOString();
     db.giorni[L.data] = e;
@@ -1255,11 +1273,14 @@
     toast('Giornata salvata');
   }
 
-  function salvaDettagliLive() {
+  function salvaDettagliLive(origine) {
     const L = live();
+    if (origine === 'km') L.kmManuale = true;
     L.localita = $('live-localita').value.trim();
-    L.km = $('live-km').value;
     L.trasferta = $('live-trasferta').value;
+    if (L.kmManuale) L.km = $('live-km').value;
+    else { applicaKmAuto(L); $('live-km').value = L.km || ''; }
+    renderKmInfo();
     L.indImporto = $('live-ind').value;
     L.note = $('live-note').value;
     $('live-ind-wrap').classList.toggle('hidden', L.trasferta !== 'custom');
@@ -1268,6 +1289,129 @@
     }
     salvaDb();
     aggiornaTimer();
+  }
+
+
+  // =============================================================
+  // KM AUTOMATICI (posizione sede → posizione cantiere)
+  // =============================================================
+  function posizioneAttuale() {
+    return new Promise((ok, ko) => {
+      if (!navigator.geolocation) return ko(new Error('nogps'));
+      navigator.geolocation.getCurrentPosition(
+        p => ok({ lat: p.coords.latitude, lon: p.coords.longitude, acc: Math.round(p.coords.accuracy || 0) }),
+        err => ko(err), { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+    });
+  }
+  function kmLineaAria(a, b) {
+    const R = 6371, r = x => x * Math.PI / 180;
+    const dLat = r(b.lat - a.lat), dLon = r(b.lon - a.lon);
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(h));
+  }
+  async function fetchJson(url, ms = 10000) {
+    const c = new AbortController(); const t = setTimeout(() => c.abort(), ms);
+    try { const r = await fetch(url, { signal: c.signal }); if (!r.ok) throw new Error('http ' + r.status); return await r.json(); }
+    finally { clearTimeout(t); }
+  }
+  async function kmStrada(a, b) {
+    const j = await fetchJson(`https://router.project-osrm.org/route/v1/driving/${a.lon},${a.lat};${b.lon},${b.lat}?overview=false`);
+    if (!j.routes || !j.routes.length) throw new Error('nessun percorso');
+    return j.routes[0].distance / 1000;
+  }
+  async function nomeLuogo(p) {
+    const j = await fetchJson(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=14&accept-language=it&lat=${p.lat}&lon=${p.lon}`, 8000);
+    const a = j.address || {};
+    return a.city || a.town || a.village || a.hamlet || a.municipality || a.suburb || '';
+  }
+  function kmTotaliAuto(L) {
+    if (L.kmAndata == null) return null;
+    return Math.round(L.kmAndata * (L.trasferta === 'pernotto' ? 1 : 2));
+  }
+  function applicaKmAuto(L) {
+    if (L.kmManuale || L.kmAndata == null) return;
+    L.km = String(kmTotaliAuto(L));
+  }
+  function renderKmInfo() {
+    const L = live(), info = $('live-km-info'), btn = $('btn-km-gps');
+    const attivo = !['PRONTO'].includes(L.stato);
+    let t = '';
+    if (L.kmStato === 'cerco') t = 'Rilevo la posizione del cantiere…';
+    else if (L.kmErrore) t = L.kmErrore;
+    else if (L.kmAndata != null) {
+      const pern = L.trasferta === 'pernotto';
+      t = `${fmtNum(L.kmAndata, 1)} km ${L.kmStima ? 'stimati in linea d\'aria × 1,3 (ricalcolo appena c\'è rete)' : 'di strada'} dalla sede` +
+        (L.kmManuale ? '. Hai modificato i km a mano.' : `, ${pern ? 'solo andata (pernotto)' : 'andata e ritorno'}.`);
+    } else if (attivo && L.t.partenza && !imp().sede) t = 'Per calcolare i km imposta la posizione della sede in Impostazioni.';
+    info.textContent = t;
+    info.classList.toggle('hidden', !t);
+    btn.innerHTML = lbl('pin', L.kmAndata != null ? 'Ricalcola dalla posizione attuale' : 'Calcola i km dalla posizione attuale');
+    btn.classList.toggle('hidden', !attivo || !imp().sede || L.kmStato === 'cerco');
+  }
+  async function aggiornaKmDaCantiere(L) {
+    const sede = imp().sede;
+    try { L.kmAndata = Math.round(await kmStrada(sede, L.cantiere) * 10) / 10; L.kmStima = false; L.kmPending = false; }
+    catch (e) { L.kmAndata = Math.round(kmLineaAria(sede, L.cantiere) * 1.3 * 10) / 10; L.kmStima = true; L.kmPending = true; }
+    if (!L.localita) { try { const n = await nomeLuogo(L.cantiere); if (n && !L.localita) L.localita = n; } catch (e) { } }
+    if (db.live !== L) return; // nel frattempo è iniziata un'altra giornata
+    applicaKmAuto(L);
+    if (L.stato === 'FINITO' && db.giorni[L.data] && L.salvato) Object.assign(db.giorni[L.data], { km: L.km, localita: L.localita });
+    salvaDb(); aggiornaDatalist();
+    if (tabCorrente === 'oggi') renderOggi();
+  }
+  async function calcolaKmCantiere(daPulsante) {
+    const L = live();
+    if (!imp().sede) { if (daPulsante) toast('Imposta prima la posizione della sede in Impostazioni', 'pin'); renderKmInfo(); return; }
+    if (daPulsante && L.kmManuale && !confirm('Hai scritto i km a mano. Sostituirli con quelli calcolati?')) return;
+    if (daPulsante) L.kmManuale = false;
+    L.kmStato = 'cerco'; L.kmErrore = ''; renderKmInfo();
+    try {
+      const p = await posizioneAttuale();
+      L.cantiere = { lat: p.lat, lon: p.lon };
+      L.kmStato = '';
+      await aggiornaKmDaCantiere(L);
+      if (daPulsante) toast(L.kmStima ? 'Km stimati: senza rete' : 'Km calcolati', 'pin');
+    } catch (e) {
+      L.kmStato = '';
+      L.kmErrore = (e && e.code === 1) ? 'Permesso di posizione negato: consenti la posizione per questo sito oppure scrivi i km a mano.'
+        : 'Posizione non disponibile (GPS spento o segnale debole). Scrivi i km a mano o riprova.';
+      salvaDb(); renderKmInfo();
+    }
+  }
+  let kmInCorso = false;
+  async function riprovaKm() {
+    const L = db.live;
+    if (kmInCorso || !L || !L.kmPending || !L.cantiere || !imp().sede) return;
+    kmInCorso = true;
+    try { await aggiornaKmDaCantiere(L); } finally { kmInCorso = false; }
+  }
+  window.addEventListener('online', riprovaKm);
+
+  // Posizione della sede (Impostazioni)
+  async function impostaSede() {
+    if (!confirm('Sei in sede in questo momento? Verrà salvata la posizione attuale come sede.')) return;
+    $('imp-sede-info').textContent = 'Rilevo la posizione…';
+    try {
+      const p = await posizioneAttuale();
+      let nome = '';
+      try { nome = await nomeLuogo(p); } catch (e) { }
+      db.imp.sede = { lat: +p.lat.toFixed(6), lon: +p.lon.toFixed(6), nome, acc: p.acc };
+      salvaDb(); renderSedeInfo(); toast('Posizione della sede salvata', 'pin');
+    } catch (e) {
+      $('imp-sede-info').textContent = (e && e.code === 1) ? 'Permesso di posizione negato: consentilo nelle impostazioni del browser e riprova.' : 'Posizione non disponibile: controlla che il GPS sia attivo e riprova.';
+    }
+  }
+  function rimuoviSede() {
+    if (!imp().sede || !confirm('Rimuovere la posizione della sede?')) return;
+    db.imp.sede = null; salvaDb(); renderSedeInfo();
+  }
+  function renderSedeInfo() {
+    const S = imp().sede;
+    $('imp-sede-info').textContent = S
+      ? `Salvata${S.nome ? ': ' + S.nome : ''} (${S.lat.toFixed(5)}, ${S.lon.toFixed(5)}${S.acc ? `, precisione ±${S.acc} m` : ''}).`
+      : 'Non impostata. Quando sei in sede premi «Usa la posizione attuale».';
+    $('btn-sede').innerHTML = lbl('pin', S ? 'Aggiorna posizione' : 'Usa la posizione attuale');
+    $('btn-sede-rimuovi').classList.toggle('hidden', !S);
   }
 
   function azzeraLive() {
@@ -1331,6 +1475,8 @@
 
     $('live-localita').value = L.localita || '';
     $('live-km').value = L.km || '';
+    renderKmInfo();
+    if (L.kmPending && navigator.onLine) riprovaKm();
     $('live-trasferta').value = L.trasferta || 'no';
     $('live-ind').value = L.indImporto || '';
     $('live-note').value = L.note || '';
@@ -1942,6 +2088,7 @@
       r.onchange = () => { db.imp.tema = r.value; salvaDb(); applicaTema(); };
     });
     aggiornaInfoImp();
+    renderSedeInfo();
     $('imp-backup-info').textContent = db.ultimoBackup ? `Ultimo backup: ${new Date(db.ultimoBackup).toLocaleString('it-IT')}` : 'Nessun backup esportato finora.';
     const n = Object.keys(db.giorni).length;
     let kb = 0; try { kb = Math.round((localStorage.getItem(LS_KEY) || '').length / 1024); } catch (e) {}

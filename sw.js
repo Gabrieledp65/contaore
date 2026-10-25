@@ -1,6 +1,6 @@
 // Segna Ore – service worker: l'app funziona anche senza rete.
-// Quando pubblichi una nuova versione di index.html cambia CACHE (es. 'segna-ore-v1.6') per forzare l'aggiornamento.
-const CACHE = 'segna-ore-v1.6';
+// Quando pubblichi una nuova versione di index.html cambia CACHE (es. 'segna-ore-v1.7') per forzare l'aggiornamento.
+const CACHE = 'segna-ore-v1.7';
 const FILE_LOCALI = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 const LIBRERIE = [
   'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
