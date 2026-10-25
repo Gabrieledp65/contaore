@@ -1,0 +1,1982 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Segna Ore</title>
+
+  <!-- PWA: installabile sulla schermata Home e utilizzabile senza rete (manifest.json e sw.js accanto a questo file) -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#EEF1F5" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0E131D" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Segna Ore">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="icon" type="image/png" href="icon-192.png">
+
+  <!-- Archivo: un'unica famiglia a larghezza variabile (stretta per i numeri, larga per i titoli) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg: #EEF1F5; --surface: #FFFFFF; --surface-2: #F3F5F9; --ink: #141A26; --ink-2: #4A5568; --ink-3: #8A94A6; --line: #E0E5EC;
+      --cobalt: #2F5BEA; --cobalt-soft: #E6ECFD; --cobalt-ink: #1E3FB0;
+      --amber: #E89A00; --amber-soft: #FFF2D4; --amber-ink: #8A5A00;
+      --indigo: #6D5BD0; --indigo-soft: #EDEAFB;
+      --green: #17945F; --green-soft: #DCF3E8; --green-ink: #0E6B44;
+      --red: #D63B3B; --red-soft: #FCE6E6; --red-ink: #A12424;
+      --dial: #182031; --dial-ink: #F2F5FA; --dial-ink-2: #9AA6BC; --dial-track: rgba(255,255,255,.08); --dial-line: rgba(255,255,255,.1);
+      --shadow: 0 1px 2px rgba(20,26,38,.04), 0 8px 24px -12px rgba(20,26,38,.12);
+      --on-accent: #FFFFFF;
+      --font: "Archivo", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color-scheme: light;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #0E131D; --surface: #161D2A; --surface-2: #1D2534; --ink: #E9EDF4; --ink-2: #A9B3C4; --ink-3: #6F7A8E; --line: #263044;
+        --cobalt: #6E8FFF; --cobalt-soft: rgba(110,143,255,.14); --cobalt-ink: #A9BCFF;
+        --amber: #FFB52E; --amber-soft: rgba(255,181,46,.13); --amber-ink: #FFCB6B;
+        --indigo: #9C8CFF; --indigo-soft: rgba(156,140,255,.14);
+        --green: #34C98A; --green-soft: rgba(52,201,138,.13); --green-ink: #6EE0AE;
+        --red: #FF6B6B; --red-soft: rgba(255,107,107,.13); --red-ink: #FF9C9C;
+        --dial: #1A2335; --shadow: none; color-scheme: dark; --on-accent: #0B1020;
+      }
+    }
+    :root[data-theme="dark"] {
+      --bg: #0E131D; --surface: #161D2A; --surface-2: #1D2534; --ink: #E9EDF4; --ink-2: #A9B3C4; --ink-3: #6F7A8E; --line: #263044;
+      --cobalt: #6E8FFF; --cobalt-soft: rgba(110,143,255,.14); --cobalt-ink: #A9BCFF;
+      --amber: #FFB52E; --amber-soft: rgba(255,181,46,.13); --amber-ink: #FFCB6B;
+      --indigo: #9C8CFF; --indigo-soft: rgba(156,140,255,.14);
+      --green: #34C98A; --green-soft: rgba(52,201,138,.13); --green-ink: #6EE0AE;
+      --red: #FF6B6B; --red-soft: rgba(255,107,107,.13); --red-ink: #FF9C9C;
+      --dial: #1A2335; --shadow: none; color-scheme: dark; --on-accent: #0B1020;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 15px; line-height: 1.45;
+      -webkit-tap-highlight-color: transparent; -webkit-font-smoothing: antialiased;
+      padding-bottom: calc(96px + env(safe-area-inset-bottom));
+    }
+    button, input, select, textarea { font: inherit; color: inherit; }
+    button { cursor: pointer; }
+    :focus-visible { outline: 2px solid var(--cobalt); outline-offset: 2px; }
+    .hidden { display: none !important; }
+    .num { font-variant-numeric: tabular-nums; }
+    svg.i { width: 20px; height: 20px; flex: none; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+    /* ---------- Testata con titolo grande ---------- */
+    .top { max-width: 560px; margin: 0 auto; padding: calc(14px + env(safe-area-inset-top)) 18px 6px; display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+    .top h1 { margin: 0; font-size: 30px; line-height: 1.05; font-weight: 800; font-stretch: 112%; letter-spacing: -.6px; }
+    .top h1::first-letter { text-transform: uppercase; }
+    .top .kicker { font-size: 13px; color: var(--ink-3); font-weight: 600; margin-bottom: 3px; }
+    .top .ctl { display: flex; gap: 6px; }
+    .icon-btn { width: 40px; height: 40px; border-radius: 12px; border: 0; background: var(--surface); color: var(--ink-2); display: grid; place-items: center; box-shadow: var(--shadow); }
+    .icon-btn:active { transform: scale(.95); }
+
+    main { max-width: 560px; margin: 0 auto; padding: 8px 14px 8px; }
+    .view { display: none; }
+    .view.on { display: block; }
+
+    /* ---------- Superfici ---------- */
+    .panel { background: var(--surface); border-radius: 20px; box-shadow: var(--shadow); margin-bottom: 14px; overflow: hidden; }
+    .panel.pad { padding: 16px; }
+    .sec { font-size: 15px; font-weight: 700; margin: 22px 4px 8px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+    .sec small { font-size: 12.5px; font-weight: 500; color: var(--ink-3); }
+    .help { font-size: 12.5px; color: var(--ink-3); margin: 6px 2px 0; line-height: 1.45; }
+    .r { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--line); font-size: 14.5px; }
+    .r:first-child { border-top: 0; }
+    .r .k { color: var(--ink-2); min-width: 0; }
+    .r .k em { font-style: normal; color: var(--ink-3); font-size: 12.5px; display: block; }
+    .r .v { font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+    .r.sub .k { padding-left: 12px; font-size: 13.5px; }
+    .r.tot { background: var(--surface-2); }
+    .r.tot .k { color: var(--ink); font-weight: 700; }
+    .r.tot .v { font-size: 17px; font-stretch: 90%; }
+    .r.big .v { font-size: 22px; font-weight: 800; font-stretch: 85%; color: var(--green); }
+    .empty { padding: 16px; color: var(--ink-3); font-size: 14px; }
+
+    .chip { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: var(--surface-2); color: var(--ink-2); white-space: nowrap; }
+    .chip svg.i { width: 12px; height: 12px; stroke-width: 2.4; }
+    .c-cobalt { background: var(--cobalt-soft); color: var(--cobalt-ink); }
+    .c-amber { background: var(--amber-soft); color: var(--amber-ink); }
+    .c-indigo { background: var(--indigo-soft); color: var(--indigo); }
+    .c-green { background: var(--green-soft); color: var(--green-ink); }
+    .c-red { background: var(--red-soft); color: var(--red-ink); }
+
+    /* ---------- Pulsanti ---------- */
+    .btn { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 56px; border: 0; border-radius: 16px; padding: 12px 16px; font-weight: 700; font-size: 16px; font-stretch: 105%; color: var(--on-accent); background: var(--cobalt); transition: transform .08s; text-align: center; line-height: 1.2; }
+    .btn:active { transform: scale(.98); }
+    .btn.go { background: var(--green); } .btn.warn { background: var(--amber); color: #2A1C00; } .btn.stop { background: var(--red); }
+    .btn.ink { background: var(--ink); color: var(--bg); }
+    .btn.soft { background: var(--surface-2); color: var(--ink); min-height: 48px; font-size: 14.5px; }
+    .btn.soft-cobalt { background: var(--cobalt-soft); color: var(--cobalt-ink); min-height: 48px; font-size: 14.5px; }
+    .btn.soft-red { background: var(--red-soft); color: var(--red-ink); min-height: 48px; font-size: 14.5px; }
+    .btn.sm { min-height: 44px; font-size: 14px; border-radius: 13px; }
+    .stack > * + * { margin-top: 10px; }
+    .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .link { background: none; border: 0; color: var(--ink-2); font-size: 13.5px; font-weight: 600; padding: 8px 6px; display: inline-flex; align-items: center; gap: 6px; }
+    .link svg.i { width: 16px; height: 16px; }
+
+    /* ---------- Campi ---------- */
+    label.f { display: block; font-size: 13px; font-weight: 600; color: var(--ink-2); margin: 0 2px 6px; }
+    .inp { width: 100%; border: 1.5px solid transparent; border-radius: 13px; padding: 11px 12px; background: var(--surface-2); font-size: 16px; font-weight: 600; min-height: 48px; font-variant-numeric: tabular-nums; -webkit-appearance: none; appearance: none; }
+    select.inp { background-image: linear-gradient(45deg, transparent 50%, var(--ink-3) 50%), linear-gradient(135deg, var(--ink-3) 50%, transparent 50%); background-position: calc(100% - 18px) 21px, calc(100% - 13px) 21px; background-size: 5px 5px; background-repeat: no-repeat; padding-right: 32px; }
+    .inp:focus { outline: none; border-color: var(--cobalt); background-color: var(--surface); }
+    textarea.inp { min-height: 70px; font-weight: 500; resize: vertical; }
+    .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 10px; }
+    .fields .full { grid-column: 1 / -1; }
+    .chk { display: flex; align-items: center; gap: 10px; font-size: 14.5px; font-weight: 600; }
+    .chk input { width: 22px; height: 22px; accent-color: var(--cobalt); flex: none; }
+    .seg { display: flex; background: var(--surface-2); border-radius: 13px; padding: 4px; gap: 4px; }
+    .seg label { flex: 1; text-align: center; padding: 9px 4px; border-radius: 10px; font-size: 13.5px; font-weight: 700; color: var(--ink-2); }
+    .seg input { display: none; }
+    .seg label:has(input:checked) { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+    .days-pick { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+    .days-pick label { text-align: center; border-radius: 11px; padding: 10px 0; font-size: 13px; font-weight: 700; background: var(--surface-2); color: var(--ink-3); text-transform: capitalize; }
+    .days-pick input { display: none; }
+    .days-pick label:has(input:checked) { background: var(--cobalt); color: var(--on-accent); }
+
+    /* ---------- Quadrante (l'elemento forte) ---------- */
+    .dial-card { background: var(--dial); color: var(--dial-ink); border-radius: 26px; padding: 18px 16px 16px; margin-bottom: 14px; position: relative; overflow: hidden; }
+    .dial-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .dial-head .when { font-size: 13.5px; color: var(--dial-ink-2); font-weight: 600; }
+    .state { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 700; padding: 5px 11px 5px 9px; border-radius: 999px; background: rgba(255,255,255,.08); color: var(--dial-ink); }
+    .state::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--dial-ink-2); }
+    .state.s-run::before { background: #34C98A; box-shadow: 0 0 0 0 rgba(52,201,138,.6); animation: pulse 1.8s infinite; }
+    .state.s-travel::before { background: #6E8FFF; }
+    .state.s-pause::before { background: #FFB52E; }
+    .state.s-done::before { background: #F2F5FA; }
+    @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(52,201,138,.55); } 70% { box-shadow: 0 0 0 8px rgba(52,201,138,0); } 100% { box-shadow: 0 0 0 0 rgba(52,201,138,0); } }
+    .dial { position: relative; width: min(268px, 74vw); aspect-ratio: 1; margin: 6px auto 4px; }
+    .dial svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+    .dial circle { fill: none; stroke-linecap: round; transition: stroke-dashoffset .6s cubic-bezier(.2,.8,.2,1); }
+    .dial .center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+    .dial .hrs { font-size: clamp(54px, 17vw, 72px); font-weight: 800; font-stretch: 68%; line-height: .95; letter-spacing: -1px; font-variant-numeric: tabular-nums; }
+    .dial .cap { font-size: 12.5px; line-height: 1.3; color: var(--dial-ink-2); font-weight: 600; margin-top: 6px; max-width: 44%; }
+    .legend { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 4px; }
+    .legend div { text-align: center; }
+    .legend .lk { font-size: 12px; color: var(--dial-ink-2); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+    .legend .lk::before { content: ""; width: 9px; height: 9px; border-radius: 3px; background: var(--c); }
+    .legend .lv { font-size: 20px; font-weight: 800; font-stretch: 75%; font-variant-numeric: tabular-nums; margin-top: 1px; }
+
+    /* Striscia della giornata */
+    .strip { margin-top: 14px; }
+    .strip .bar { position: relative; height: 26px; border-radius: 8px; background: var(--dial-track); overflow: hidden; }
+    .strip .seg-n { position: absolute; top: 0; bottom: 0; background: repeating-linear-gradient(135deg, rgba(156,140,255,.18) 0 4px, transparent 4px 8px); }
+    .strip .seg-w { position: absolute; top: 4px; bottom: 4px; background: #6E8FFF; border-radius: 5px; }
+    .strip .seg-t { position: absolute; top: 9px; bottom: 9px; background: #6E8FFF; opacity: .45; border-radius: 4px; }
+    .strip .seg-p { position: absolute; top: 4px; bottom: 4px; background: repeating-linear-gradient(90deg, #FFB52E 0 2px, transparent 2px 5px); opacity: .9; }
+    .strip .seg-o { position: absolute; top: 4px; bottom: 4px; background: #FFB52E; border-radius: 0 5px 5px 0; }
+    .strip .now { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--dial-ink); border-radius: 2px; }
+    .strip .ticks { position: relative; height: 16px; margin-top: 4px; font-size: 10.5px; color: var(--dial-ink-2); font-variant-numeric: tabular-nums; }
+    .strip .ticks span { position: absolute; transform: translateX(-50%); }
+    .strip.light .bar { background: var(--surface-2); }
+    .strip.light .ticks { color: var(--ink-3); }
+    .strip.light .seg-w { background: var(--cobalt); }
+    .strip.light .seg-t { background: var(--cobalt); }
+    .strip.light .seg-o { background: var(--amber); }
+    .strip.light .now { background: var(--ink); }
+
+    .times { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; margin-top: 14px; background: var(--dial-line); border-radius: 14px; overflow: hidden; }
+    .times div { background: var(--dial); padding: 9px 4px; text-align: center; }
+    .times .tk { font-size: 11.5px; color: var(--dial-ink-2); font-weight: 600; }
+    .times .tv { font-size: 17px; font-weight: 800; font-stretch: 80%; font-variant-numeric: tabular-nums; }
+
+    .actions { margin-bottom: 6px; }
+    .actions .note { border-radius: 14px; padding: 12px 14px; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+    .note.n-amber { background: var(--amber-soft); color: var(--amber-ink); }
+    .note.n-green { background: var(--green-soft); color: var(--green-ink); }
+    .note.n-red { background: var(--red-soft); color: var(--red-ink); }
+    .note.n-cobalt { background: var(--cobalt-soft); color: var(--cobalt-ink); }
+    .center-links { display: flex; justify-content: center; gap: 4px; flex-wrap: wrap; margin-top: 2px; }
+
+    /* ---------- Giorni ---------- */
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border-radius: 18px; overflow: hidden; margin-bottom: 14px; box-shadow: var(--shadow); }
+    .stats div { background: var(--surface); padding: 12px 12px 11px; }
+    .stats .k { font-size: 12.5px; color: var(--ink-3); font-weight: 600; }
+    .stats .v { font-size: 24px; font-weight: 800; font-stretch: 72%; font-variant-numeric: tabular-nums; line-height: 1.15; }
+    .stats .v.cobalt { color: var(--cobalt); } .stats .v.amber { color: var(--amber); } .stats .v.green { color: var(--green); }
+
+    .daylist { background: var(--surface); border-radius: 20px; overflow: hidden; margin-bottom: 14px; box-shadow: var(--shadow); }
+    .day { display: grid; grid-template-columns: 44px 1fr auto; gap: 12px; align-items: center; padding: 11px 14px; border: 0; border-top: 1px solid var(--line); background: transparent; width: 100%; text-align: left; }
+    .day:first-child { border-top: 0; }
+    .day:active { background: var(--surface-2); }
+    .day .d { text-align: center; }
+    .day .d .n { font-size: 22px; font-weight: 800; font-stretch: 75%; line-height: 1; font-variant-numeric: tabular-nums; }
+    .day .d .w { font-size: 11.5px; font-weight: 600; color: var(--ink-3); text-transform: capitalize; margin-top: 2px; }
+    .day.fest .d .n, .day.fest .d .w { color: var(--red); }
+    .day.sab .d .w { color: var(--indigo); }
+    .day.vuoto .info .l1 { color: var(--ink-3); font-weight: 500; }
+    .day.today { background: var(--cobalt-soft); }
+    .day .info { font-size: 13.5px; min-width: 0; }
+    .day .l1 { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .day .l2 { margin-top: 5px; display: flex; gap: 4px; flex-wrap: wrap; }
+    .day .mini { position: relative; height: 6px; border-radius: 3px; background: var(--surface-2); margin-top: 7px; overflow: hidden; }
+    .day .mini i { position: absolute; top: 0; bottom: 0; }
+    .day .mini .m8 { position: absolute; top: -1px; bottom: -1px; width: 2px; background: var(--ink-3); opacity: .5; }
+    .day .tot { text-align: right; font-variant-numeric: tabular-nums; }
+    .day .tot .h { font-size: 19px; font-weight: 800; font-stretch: 75%; }
+    .day .tot .x { font-size: 12px; color: var(--amber); font-weight: 800; }
+    .day .add { width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center; background: var(--surface-2); color: var(--ink-3); }
+    .day .add svg.i { width: 16px; height: 16px; }
+    .day.manca .add { background: var(--amber-soft); color: var(--amber-ink); }
+    .week { padding: 9px 14px; background: var(--surface-2); font-size: 12.5px; font-weight: 600; color: var(--ink-2); display: flex; justify-content: space-between; gap: 8px; }
+    .week b { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+    /* Composizione del mese */
+    .compo { padding: 16px; }
+    .compo .bar { display: flex; height: 14px; border-radius: 7px; overflow: hidden; background: var(--surface-2); gap: 2px; }
+    .compo .bar i { display: block; height: 100%; }
+    .compo .lg { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; font-size: 13px; color: var(--ink-2); }
+    .compo .lg span { display: inline-flex; align-items: center; gap: 6px; }
+    .compo .lg span::before { content: ""; width: 9px; height: 9px; border-radius: 3px; background: var(--c); }
+    .compo .lg b { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+    /* ---------- Barra inferiore ---------- */
+    nav.tabs {
+      position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(10px + env(safe-area-inset-bottom)); z-index: 40;
+      width: min(420px, calc(100% - 24px)); background: var(--surface); border-radius: 22px; box-shadow: 0 10px 30px -8px rgba(20,26,38,.28), 0 0 0 1px var(--line);
+      display: grid; grid-template-columns: repeat(4, 1fr); padding: 6px;
+    }
+    nav.tabs button { border: 0; background: none; padding: 7px 0 6px; border-radius: 16px; color: var(--ink-3); font-size: 11.5px; font-weight: 700; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+    nav.tabs button svg.i { width: 22px; height: 22px; }
+    nav.tabs button.on { color: var(--cobalt); background: var(--cobalt-soft); }
+
+    /* ---------- Fogli modali ---------- */
+    .modal { position: fixed; inset: 0; z-index: 60; background: rgba(10,14,22,.5); display: flex; align-items: flex-end; justify-content: center; animation: fade .18s ease-out; }
+    .sheet { background: var(--bg); width: 100%; max-width: 560px; max-height: 94vh; max-height: 94dvh; border-radius: 24px 24px 0 0; display: flex; flex-direction: column; animation: up .26s cubic-bezier(.2,.8,.2,1); }
+    @keyframes fade { from { opacity: 0; } } @keyframes up { from { transform: translateY(40px); opacity: .6; } }
+    .sheet .grab { width: 40px; height: 5px; border-radius: 3px; background: var(--line); margin: 8px auto 0; }
+    .sheet .sh { padding: 8px 16px 10px; display: flex; justify-content: space-between; align-items: center; }
+    .sheet .sh h3 { margin: 0; font-size: 21px; font-weight: 800; font-stretch: 110%; letter-spacing: -.3px; }
+    .sheet .sb { overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 4px 14px 16px; overscroll-behavior: contain; }
+    .sheet .sb .sec:first-child { margin-top: 4px; }
+    .sheet .sf { padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); background: var(--surface); border-top: 1px solid var(--line); display: grid; grid-template-columns: 1fr 2fr; gap: 10px; }
+    details.more { background: var(--surface-2); border-radius: 13px; padding: 0 12px; margin-top: 12px; }
+    details.more summary { padding: 12px 0; font-size: 14px; font-weight: 600; color: var(--ink-2); cursor: pointer; list-style: none; display: flex; justify-content: space-between; }
+    details.more summary::after { content: "+"; font-weight: 800; color: var(--ink-3); }
+    details.more[open] summary::after { content: "–"; }
+    details.more[open] { padding-bottom: 12px; }
+    .preview { background: var(--dial); color: var(--dial-ink); border-radius: 18px; padding: 14px; margin-top: 14px; }
+    .preview .pl { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13.5px; color: var(--dial-ink-2); }
+    .preview .pl b { color: var(--dial-ink); font-weight: 800; font-variant-numeric: tabular-nums; }
+    .preview .det { margin-top: 6px; font-size: 12.5px; color: var(--dial-ink-2); }
+
+    #toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(98px + env(safe-area-inset-bottom)); z-index: 80; background: var(--ink); color: var(--bg); padding: 11px 16px; border-radius: 14px; font-size: 14px; font-weight: 700; box-shadow: 0 8px 24px rgba(0,0,0,.25); max-width: 90vw; text-align: center; display: flex; gap: 8px; align-items: center; }
+
+    @media (min-width: 600px) {
+      .modal { align-items: center; }
+      .sheet { border-radius: 24px; }
+      .sheet .sf { border-radius: 0 0 24px 24px; }
+      .sheet .grab { display: none; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before { animation: none !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="top">
+  <div>
+    <div class="kicker" id="top-kicker">Segna Ore</div>
+    <h1 id="top-title">Oggi</h1>
+  </div>
+  <div class="ctl" id="top-ctl"></div>
+</div>
+
+<main>
+
+  <!-- ======================= OGGI ======================= -->
+  <section class="view on" id="view-oggi">
+    <div id="banner-backup" class="hidden" style="margin-bottom:12px"></div>
+
+    <div class="dial-card">
+      <div class="dial-head">
+        <span class="when" id="oggi-tipo">—</span>
+        <span class="state" id="oggi-stato">Pronto</span>
+      </div>
+      <div class="dial">
+        <svg viewBox="0 0 240 240" aria-hidden="true">
+          <circle cx="120" cy="120" r="104" stroke="var(--dial-track)" stroke-width="14"/>
+          <circle id="ring-ord" cx="120" cy="120" r="104" stroke="#6E8FFF" stroke-width="14"/>
+          <circle cx="120" cy="120" r="84" stroke="var(--dial-track)" stroke-width="9"/>
+          <circle id="ring-str" cx="120" cy="120" r="84" stroke="#FFB52E" stroke-width="9"/>
+          <circle cx="120" cy="120" r="69" stroke="var(--dial-track)" stroke-width="5"/>
+          <circle id="ring-via" cx="120" cy="120" r="69" stroke="#9C8CFF" stroke-width="5"/>
+        </svg>
+        <div class="center">
+          <div class="hrs" id="oggi-lavoro">0:00</div>
+          <div class="cap" id="oggi-cap">ore di lavoro</div>
+        </div>
+      </div>
+      <div class="legend">
+        <div><span class="lk" style="--c:#6E8FFF">Ordinarie</span><div class="lv" id="lg-ord">0:00</div></div>
+        <div><span class="lk" style="--c:#FFB52E">Straord.</span><div class="lv" id="lg-str">0:00</div></div>
+        <div><span class="lk" style="--c:#9C8CFF">Viaggio</span><div class="lv" id="lg-via">0:00</div></div>
+      </div>
+      <div id="oggi-strip"></div>
+      <div class="times">
+        <div><div class="tk">Partenza</div><div class="tv" id="t-partenza">–</div></div>
+        <div><div class="tk">Inizio</div><div class="tv" id="t-inizio">–</div></div>
+        <div><div class="tk">Fine</div><div class="tv" id="t-fine">–</div></div>
+        <div><div class="tk">In sede</div><div class="tv" id="t-arrivo">–</div></div>
+      </div>
+    </div>
+
+    <div class="actions stack" id="oggi-azioni"></div>
+    <div class="center-links">
+      <button class="link" id="btn-correggi-live" onclick="apriCorreggiLive()"></button>
+      <button class="link hidden" id="btn-azzera-live" onclick="azzeraLive()"></button>
+    </div>
+
+    <div id="card-dettagli">
+      <div class="sec">Dettagli della giornata <small>salvati alla chiusura</small></div>
+      <div class="panel pad">
+        <div class="fields">
+          <div class="full">
+            <label class="f" for="live-localita">Località o cantiere</label>
+            <input class="inp" id="live-localita" list="dl-localita" placeholder="Es. Brescia, cliente Rossi" oninput="salvaDettagliLive()">
+          </div>
+          <div>
+            <label class="f" for="live-km">Km percorsi</label>
+            <input class="inp" id="live-km" type="number" inputmode="decimal" min="0" step="1" placeholder="0" oninput="salvaDettagliLive()">
+          </div>
+          <div>
+            <label class="f" for="live-trasferta">Trasferta</label>
+            <select class="inp" id="live-trasferta" onchange="salvaDettagliLive()">
+              <option value="no">Nessuna</option>
+              <option value="giornaliera">Giornaliera</option>
+              <option value="pernotto">Con pernotto</option>
+              <option value="custom">Importo a mano</option>
+            </select>
+          </div>
+          <div class="full hidden" id="live-ind-wrap">
+            <label class="f" for="live-ind">Importo indennità (€)</label>
+            <input class="inp" id="live-ind" type="number" inputmode="decimal" min="0" step="0.01" oninput="salvaDettagliLive()">
+          </div>
+          <div class="full">
+            <label class="f" for="live-note">Note</label>
+            <input class="inp" id="live-note" placeholder="Facoltative" oninput="salvaDettagliLive()">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="card-oggi-salvato" class="hidden">
+      <div class="sec">Già registrato oggi</div>
+      <div class="panel" id="oggi-salvato-info"></div>
+    </div>
+  </section>
+
+  <!-- ======================= GIORNI ======================= -->
+  <section class="view" id="view-giorni">
+    <div class="stats" id="giorni-stats"></div>
+    <div class="g2" style="margin-bottom:12px">
+      <button class="btn sm" onclick="apriEditor(null)"></button>
+      <button class="btn sm soft" onclick="apriAssenzaMultipla()"></button>
+    </div>
+    <div id="giorni-manca" class="hidden" style="margin-bottom:12px"></div>
+    <div class="daylist" id="giorni-lista"></div>
+    <p class="help" style="text-align:center">Tocca un giorno per aggiungerlo o correggerlo.</p>
+  </section>
+
+  <!-- ======================= RIEPILOGO ======================= -->
+  <section class="view" id="view-riepilogo">
+    <div class="stats" id="riep-stats"></div>
+    <div class="panel compo" id="riep-compo"></div>
+
+    <div class="sec">Ore</div>
+    <div class="panel" id="riep-ore"></div>
+    <div class="sec">Straordinari</div>
+    <div class="panel" id="riep-straord"></div>
+    <div class="sec">Trasferte</div>
+    <div class="panel" id="riep-trasferte"></div>
+    <div class="sec">Assenze</div>
+    <div class="panel" id="riep-assenze"></div>
+    <div class="sec">Stima busta paga <small>indicativa</small></div>
+    <div class="panel" id="riep-paga"></div>
+    <p class="help" id="riep-paga-nota"></p>
+    <div class="sec">Ferie e permessi <small id="saldi-anno"></small></div>
+    <div class="panel" id="riep-saldi"></div>
+    <details class="more" style="margin-top:-4px;margin-bottom:14px">
+      <summary>Residui iniziali dell'anno</summary>
+      <div class="fields">
+        <div><label class="f" for="saldo-ferie">Ferie residue (ore)</label><input class="inp" id="saldo-ferie" type="number" inputmode="decimal" step="0.5" onchange="salvaSaldiIniziali()"></div>
+        <div><label class="f" for="saldo-par">ROL/PAR residui (ore)</label><input class="inp" id="saldo-par" type="number" inputmode="decimal" step="0.5" onchange="salvaSaldiIniziali()"></div>
+      </div>
+      <p class="help">Residui al 1° gennaio, dalla busta di dicembre (se sei assunto quest'anno lascia 0). Se la busta indica giorni di ferie, moltiplica per le ore giornaliere.</p>
+    </details>
+
+    <div class="g2" style="margin:18px 0 12px">
+      <button class="btn ink sm" onclick="esportaPDF()" id="btn-pdf"></button>
+      <button class="btn soft sm" onclick="esportaCSV()" id="btn-csv"></button>
+    </div>
+  </section>
+
+  <!-- ======================= IMPOSTAZIONI ======================= -->
+  <section class="view" id="view-imp">
+    <div class="sec" style="margin-top:6px">Orario di lavoro</div>
+    <div class="panel pad">
+      <div class="fields">
+        <div class="full"><label class="f">Il tuo nome (compare nel PDF)</label><input class="inp" data-imp="nome" placeholder="Nome e cognome"></div>
+        <div class="full">
+          <label class="f">Giorni lavorativi</label>
+          <div class="days-pick" id="imp-giorni"></div>
+          <p class="help">Il lavoro nei giorni non selezionati (es. sabato) è tutto straordinario. Domeniche e festivi contano sempre come festivo.</p>
+        </div>
+        <div><label class="f">Ore ordinarie al giorno</label><input class="inp" data-imp="oreGiorno" type="number" inputmode="decimal" step="0.25" min="1" max="12"></div>
+        <div><label class="f">Pausa abituale (min)</label><input class="inp" data-imp="pausaStd" type="number" inputmode="numeric" step="5" min="0"></div>
+        <div><label class="f">Inizio abituale</label><input class="inp" data-imp="inizioStd" type="time"></div>
+        <div><label class="f">Fine abituale</label><input class="inp" data-imp="fineStd" type="time"></div>
+        <div><label class="f">Notturno dalle</label><input class="inp" data-imp="notteDa" type="time"></div>
+        <div><label class="f">Notturno alle</label><input class="inp" data-imp="notteA" type="time"></div>
+        <div class="full">
+          <label class="f">Santo patrono del tuo comune</label>
+          <input class="inp" data-imp="patrono" type="text" placeholder="GG/MM, es. 15/02">
+          <p class="help">Festività nazionali e Pasquetta sono già incluse, anche San Francesco (4 ottobre), festivo dal 2026.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec">Paga</div>
+    <div class="panel pad">
+      <div class="fields">
+        <div class="full">
+          <div class="seg" id="imp-modo">
+            <label><input type="radio" name="modoPaga" value="ora"><span>Pagato a ore</span></label>
+            <label><input type="radio" name="modoPaga" value="mese"><span>Stipendio mensile</span></label>
+          </div>
+          <p class="help" id="imp-modo-help"></p>
+        </div>
+        <div id="imp-wrap-ora"><label class="f">Paga oraria (€)</label><input class="inp" data-imp="pagaOraria" type="number" inputmode="decimal" step="0.00001" min="0"></div>
+        <div id="imp-wrap-mese" class="hidden"><label class="f">Retribuzione mensile (€)</label><input class="inp" data-imp="pagaMensile" type="number" inputmode="decimal" step="0.01" min="0"></div>
+        <div id="imp-wrap-div" class="hidden"><label class="f">Divisore orario</label><input class="inp" data-imp="divisore" type="number" inputmode="numeric" step="1" min="1"></div>
+        <div><label class="f">Trattenute (%)</label><input class="inp" data-imp="aliquota" type="number" inputmode="decimal" step="0.1" min="0" max="60"></div>
+        <div class="full"><label class="f">Crediti fiscali in busta (€/mese)</label><input class="inp" data-imp="crediti" type="number" inputmode="decimal" step="0.01" min="0"></div>
+      </div>
+      <p class="help">Trattenute: totale trattenute diviso imponibile contributivo (nella tua busta di settembre 390,72 ÷ 1.590 = 24,6%). Crediti: trattamento integrativo e somma per il cuneo fiscale (55,89 + 69,05). Entrambi cambiano con il reddito: aggiornali con una busta di un mese intero.</p>
+    </div>
+
+    <div class="sec">Maggiorazioni straordinario <small>%</small></div>
+    <div class="panel pad">
+      <div class="fields">
+        <div><label class="f">Feriale, prime 2 ore</label><input class="inp" data-imp="mag.str1" type="number" inputmode="decimal"></div>
+        <div><label class="f">Feriale, successive</label><input class="inp" data-imp="mag.str2" type="number" inputmode="decimal"></div>
+        <div><label class="f">Sabato, prime 2 ore</label><input class="inp" data-imp="mag.sab1" type="number" inputmode="decimal"></div>
+        <div><label class="f">Sabato, successive</label><input class="inp" data-imp="mag.sab2" type="number" inputmode="decimal"></div>
+        <div><label class="f">Notturno</label><input class="inp" data-imp="mag.strNott" type="number" inputmode="decimal"></div>
+        <div><label class="f">Festivo</label><input class="inp" data-imp="mag.fest" type="number" inputmode="decimal"></div>
+        <div><label class="f">Festivo notturno</label><input class="inp" data-imp="mag.festNott" type="number" inputmode="decimal"></div>
+        <div><label class="f">Notturno in orario</label><input class="inp" data-imp="mag.nottOrd" type="number" inputmode="decimal"></div>
+      </div>
+      <p class="help">CCNL Metalmeccanici Industria, lavoro non a turni. Feriale 25% e sabato oltre le 2 ore 50% sono confermati dalla tua busta. «Notturno in orario» (ore notturne entro le ordinarie) va verificato.</p>
+    </div>
+
+    <div class="sec">Trasferte e viaggio</div>
+    <div class="panel pad">
+      <div class="fields">
+        <div><label class="f">Indennità giornaliera (€)</label><input class="inp" data-imp="indGiorno" type="number" inputmode="decimal" step="0.01" min="0"></div>
+        <div><label class="f">Con pernotto (€)</label><input class="inp" data-imp="indPernotto" type="number" inputmode="decimal" step="0.01" min="0"></div>
+        <div><label class="f">Viaggio pagato al (%)</label><input class="inp" data-imp="viaggioPerc" type="number" inputmode="decimal" step="1" min="0" max="200"></div>
+        <div><label class="f">Rimborso per km (€)</label><input class="inp" data-imp="euroKm" type="number" inputmode="decimal" step="0.01" min="0"></div>
+        <div class="full"><label class="chk"><input type="checkbox" data-imp="viaggioCopre"> Il viaggio completa prima l'orario normale</label></div>
+      </div>
+      <p class="help">Se attivo: in un giorno con 6 ore di lavoro e 3 di viaggio, 2 ore di viaggio completano le 8 ordinarie e solo 1 è pagata come viaggio. Il viaggio non fa mai scattare lo straordinario.</p>
+    </div>
+
+    <div class="sec">Ferie e permessi annui</div>
+    <div class="panel pad">
+      <div class="fields">
+        <div class="full"><label class="f">Data di assunzione</label><input class="inp" data-imp="dataAssunzione" type="date"></div>
+        <div><label class="f">Ferie all'anno (ore)</label><input class="inp" data-imp="ferieAnnue" type="number" inputmode="decimal" step="1" min="0"></div>
+        <div><label class="f">ROL/PAR all'anno (ore)</label><input class="inp" data-imp="parAnnue" type="number" inputmode="decimal" step="1" min="0"></div>
+      </div>
+      <p class="help">Ferie e permessi maturano dal mese di assunzione: il primo mese conta intero se lavori almeno 15 giorni. Dalla tua busta: 1,67 giorni di ferie e 8,67 ore di permessi al mese, cioè 160 e 104 ore all'anno.</p>
+    </div>
+
+    <div class="sec">Aspetto</div>
+    <div class="panel pad">
+      <div class="fields">
+        <div class="full">
+          <label class="f">Tema</label>
+          <div class="seg" id="imp-tema">
+            <label><input type="radio" name="tema" value="auto"><span>Automatico</span></label>
+            <label><input type="radio" name="tema" value="light"><span>Chiaro</span></label>
+            <label><input type="radio" name="tema" value="dark"><span>Scuro</span></label>
+          </div>
+        </div>
+        <div class="full">
+          <label class="f">Formato ore</label>
+          <select class="inp" data-imp="formatoOre">
+            <option value="hm">Ore e minuti (7:45)</option>
+            <option value="dec">Decimali come in busta (7,75)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec">Backup</div>
+    <div class="panel pad">
+      <p style="margin:0 0 4px;font-size:14px">I dati restano solo su questo telefono. Se cancelli i dati del browser o cambi telefono si perdono: esporta un backup ogni tanto e salvalo su Drive, iCloud o per email.</p>
+      <p class="help" id="imp-backup-info" style="margin-bottom:12px"></p>
+      <div class="stack">
+        <button class="btn sm" onclick="esportaBackup()" id="btn-backup"></button>
+        <button class="btn sm soft" onclick="$('file-import').click()" id="btn-import"></button>
+        <input type="file" id="file-import" accept="application/json,.json" class="hidden" onchange="importaBackup(this)">
+        <button class="btn sm soft-red" onclick="cancellaTutto()" id="btn-cancella"></button>
+      </div>
+      <p class="help" id="imp-storage-info"></p>
+    </div>
+  </section>
+</main>
+
+<datalist id="dl-localita"></datalist>
+
+<nav class="tabs" aria-label="Sezioni">
+  <button class="on" data-tab="oggi" onclick="vai('oggi')"></button>
+  <button data-tab="giorni" onclick="vai('giorni')"></button>
+  <button data-tab="riepilogo" onclick="vai('riepilogo')"></button>
+  <button data-tab="imp" onclick="vai('imp')"></button>
+</nav>
+
+<!-- ======================= EDITOR GIORNO ======================= -->
+<div class="modal hidden" id="modal-editor" onclick="if(event.target===this) chiudiEditor()">
+  <div class="sheet" role="dialog" aria-labelledby="ed-titolo">
+    <div class="grab"></div>
+    <div class="sh">
+      <h3 id="ed-titolo">Giorno</h3>
+      <button class="icon-btn" onclick="chiudiEditor()" aria-label="Chiudi" data-ico="x"></button>
+    </div>
+    <div class="sb" id="ed-body">
+      <div class="panel pad" style="margin-bottom:0">
+        <div class="fields">
+          <div>
+            <label class="f" for="ed-data">Data</label>
+            <input class="inp" type="date" id="ed-data" onchange="edDataCambiata()">
+          </div>
+          <div style="display:flex;align-items:flex-end;padding-bottom:12px" id="ed-tipo-giorno"></div>
+          <button class="btn sm soft-cobalt" type="button" onclick="edGiornataStandard()" id="btn-ed-std"></button>
+          <button class="btn sm soft" type="button" onclick="edCopiaPrecedente()" id="btn-ed-copia"></button>
+        </div>
+      </div>
+
+      <div class="sec">Orari</div>
+      <div class="panel pad">
+        <div class="fields">
+          <div><label class="f" for="ed-partenza">Partenza dalla sede</label><input class="inp" type="time" id="ed-partenza" oninput="edAnteprima()"></div>
+          <div><label class="f" for="ed-inizio">Inizio lavoro</label><input class="inp" type="time" id="ed-inizio" oninput="edAnteprima()"></div>
+          <div><label class="f" for="ed-fine">Fine lavoro</label><input class="inp" type="time" id="ed-fine" oninput="edAnteprima()"></div>
+          <div><label class="f" for="ed-arrivo">Rientro in sede</label><input class="inp" type="time" id="ed-arrivo" oninput="edAnteprima()"></div>
+          <div><label class="f" for="ed-pausa">Pausa (minuti)</label><input class="inp" type="number" inputmode="numeric" min="0" step="5" id="ed-pausa" placeholder="0" oninput="edAnteprima()"></div>
+          <div><label class="f" for="ed-rientro">Partenza rientro</label><input class="inp" type="time" id="ed-rientro" oninput="edAnteprima()"></div>
+        </div>
+        <p class="help">Senza trasferta bastano inizio, fine e pausa. «Partenza rientro» serve solo se diversa dalla fine del lavoro. Un orario precedente al precedente vale per il giorno dopo.</p>
+        <details class="more" id="ed-override-box">
+          <summary>Non ricordi gli orari? Inserisci le ore totali</summary>
+          <div class="fields">
+            <div><label class="f" for="ed-ore-lavoro">Ore lavoro</label><input class="inp" type="number" inputmode="decimal" min="0" max="24" step="0.25" id="ed-ore-lavoro" placeholder="auto" oninput="edAnteprima()"></div>
+            <div><label class="f" for="ed-ore-viaggio">Ore viaggio</label><input class="inp" type="number" inputmode="decimal" min="0" max="24" step="0.25" id="ed-ore-viaggio" placeholder="auto" oninput="edAnteprima()"></div>
+          </div>
+          <p class="help">Prevalgono sugli orari. 7,5 significa 7 ore e 30.</p>
+        </details>
+      </div>
+
+      <div class="sec">Assenza</div>
+      <div class="panel pad">
+        <div class="fields">
+          <div>
+            <label class="f" for="ed-ass-tipo">Tipo</label>
+            <select class="inp" id="ed-ass-tipo" onchange="edAssenzaCambiata()">
+              <option value="">Nessuna</option>
+              <option value="ferie">Ferie</option>
+              <option value="par">ROL / PAR</option>
+              <option value="permesso">Permesso retribuito</option>
+              <option value="malattia">Malattia</option>
+              <option value="nonretr">Permesso non retribuito</option>
+              <option value="altro">Altro</option>
+            </select>
+          </div>
+          <div><label class="f" for="ed-ass-ore">Ore</label><input class="inp" type="number" inputmode="decimal" min="0" max="24" step="0.25" id="ed-ass-ore" oninput="edAnteprima()"></div>
+        </div>
+        <p class="help">Si può combinare con le ore di lavoro, per esempio 4 ore lavorate e 4 di ROL.</p>
+      </div>
+
+      <div class="sec">Trasferta</div>
+      <div class="panel pad">
+        <div class="fields">
+          <div class="full"><label class="f" for="ed-localita">Località o cantiere</label><input class="inp" id="ed-localita" list="dl-localita" placeholder="Facoltativa"></div>
+          <div><label class="f" for="ed-km">Km percorsi</label><input class="inp" type="number" inputmode="decimal" min="0" step="1" id="ed-km" placeholder="0" oninput="edAnteprima()"></div>
+          <div>
+            <label class="f" for="ed-trasferta">Indennità</label>
+            <select class="inp" id="ed-trasferta" onchange="edTrasfertaCambiata()">
+              <option value="no">Nessuna</option>
+              <option value="giornaliera">Giornaliera</option>
+              <option value="pernotto">Con pernotto</option>
+              <option value="custom">Importo a mano</option>
+            </select>
+          </div>
+          <div class="full hidden" id="ed-ind-wrap"><label class="f" for="ed-ind">Importo indennità (€)</label><input class="inp" type="number" inputmode="decimal" min="0" step="0.01" id="ed-ind" oninput="edAnteprima()"></div>
+          <div class="full"><label class="f" for="ed-note">Note</label><textarea class="inp" id="ed-note" placeholder="Facoltative"></textarea></div>
+        </div>
+      </div>
+
+      <div class="preview" id="ed-anteprima"></div>
+      <button class="btn sm soft-red hidden" id="ed-elimina" type="button" style="margin-top:14px" onclick="edElimina()"></button>
+    </div>
+    <div class="sf">
+      <button class="btn sm soft" onclick="chiudiEditor()">Annulla</button>
+      <button class="btn sm go" onclick="edSalva()" id="btn-ed-salva"></button>
+    </div>
+  </div>
+</div>
+
+<!-- ======================= ASSENZA SU PIÙ GIORNI ======================= -->
+<div class="modal hidden" id="modal-multi" onclick="if(event.target===this) chiudiModal('modal-multi')">
+  <div class="sheet" role="dialog" aria-labelledby="mu-titolo">
+    <div class="grab"></div>
+    <div class="sh"><h3 id="mu-titolo">Assenza su più giorni</h3><button class="icon-btn" onclick="chiudiModal('modal-multi')" aria-label="Chiudi" data-ico="x"></button></div>
+    <div class="sb">
+      <div class="panel pad">
+        <div class="fields">
+          <div><label class="f" for="mu-da">Dal</label><input class="inp" type="date" id="mu-da"></div>
+          <div><label class="f" for="mu-a">Al</label><input class="inp" type="date" id="mu-a"></div>
+          <div class="full">
+            <label class="f" for="mu-tipo">Tipo</label>
+            <select class="inp" id="mu-tipo">
+              <option value="ferie">Ferie</option>
+              <option value="par">ROL / PAR</option>
+              <option value="permesso">Permesso retribuito</option>
+              <option value="malattia">Malattia</option>
+              <option value="nonretr">Permesso non retribuito</option>
+              <option value="altro">Altro</option>
+            </select>
+          </div>
+          <div class="full"><label class="chk"><input type="checkbox" id="mu-sovrascrivi"> Sostituisci i giorni già compilati</label></div>
+        </div>
+        <p class="help">Vengono segnati solo i giorni lavorativi, saltando weekend e festivi, con le ore ordinarie impostate.</p>
+      </div>
+    </div>
+    <div class="sf">
+      <button class="btn sm soft" onclick="chiudiModal('modal-multi')">Annulla</button>
+      <button class="btn sm go" onclick="salvaAssenzaMultipla()">Segna i giorni</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======================= CORREZIONE CRONOMETRO ======================= -->
+<div class="modal hidden" id="modal-live" onclick="if(event.target===this) chiudiModal('modal-live')">
+  <div class="sheet" role="dialog" aria-labelledby="lv-titolo">
+    <div class="grab"></div>
+    <div class="sh"><h3 id="lv-titolo">Correggi il cronometro</h3><button class="icon-btn" onclick="chiudiModal('modal-live')" aria-label="Chiudi" data-ico="x"></button></div>
+    <div class="sb">
+      <div class="panel pad">
+        <div class="fields">
+          <div><label class="f" for="lv-partenza">Partenza</label><input class="inp" type="time" id="lv-partenza"></div>
+          <div><label class="f" for="lv-inizio">Inizio lavoro</label><input class="inp" type="time" id="lv-inizio"></div>
+          <div><label class="f" for="lv-fine">Fine lavoro</label><input class="inp" type="time" id="lv-fine"></div>
+          <div><label class="f" for="lv-arrivo">Rientro in sede</label><input class="inp" type="time" id="lv-arrivo"></div>
+          <div><label class="f" for="lv-pausa">Pausa già fatta (min)</label><input class="inp" type="number" inputmode="numeric" min="0" step="5" id="lv-pausa"></div>
+        </div>
+        <p class="help">Lascia vuoti gli orari non ancora arrivati: il cronometro riparte dal punto giusto. Con solo «Inizio lavoro» risulti al lavoro da quell'ora.</p>
+      </div>
+    </div>
+    <div class="sf">
+      <button class="btn sm soft" onclick="chiudiModal('modal-live')">Annulla</button>
+      <button class="btn sm go" onclick="applicaCorreggiLive()">Applica</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="hidden"></div>
+
+<script>
+  'use strict';
+  const APP_VERSION = 'v1.3';
+  const LS_KEY = 'segnaore_v1';
+  const $ = id => document.getElementById(id);
+
+  // =============================================================
+  // ICONE
+  // =============================================================
+  const ICO_PATHS = {
+    play: '<path d="M7 4.5l12 7.5-12 7.5z"/>',
+    pause: '<path d="M8 5v14M16 5v14"/>',
+    stop: '<rect x="6" y="6" width="12" height="12" rx="2.5"/>',
+    car: '<path d="M3.5 16.5V13l2.2-5.2A2 2 0 017.5 6.5h9a2 2 0 011.8 1.3l2.2 5.2v3.5z"/><path d="M3.5 13h17M7 16.5V19M17 16.5V19"/><circle cx="7.5" cy="13" r=".6"/><circle cx="16.5" cy="13" r=".6"/>',
+    sede: '<path d="M4 21V9.5L12 5l8 4.5V21"/><path d="M2.5 21h19M9.5 21v-5h5v5M9 12h.01M15 12h.01"/>',
+    home: '<path d="M4 11l8-7 8 7v9H4z"/><path d="M10 20v-5h4v5"/>',
+    edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    undo: '<path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/>',
+    clock: '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9.5 2.5h5"/>',
+    cal: '<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
+    chart: '<path d="M5 20V11M11 20V5M17 20v-7"/><path d="M3 20h18"/>',
+    sliders: '<path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="17" r="2"/>',
+    moon: '<path d="M20 14.5A8 8 0 019.5 4a7 7 0 1010.5 10.5z"/>',
+    bed: '<path d="M3 19V7M3 15h18v4M21 15v-2.5a3 3 0 00-3-3h-7.5V15"/><circle cx="6.8" cy="11.5" r="1.8"/>',
+    pin: '<path d="M12 21s6.5-5.6 6.5-11a6.5 6.5 0 10-13 0c0 5.4 6.5 11 6.5 11z"/><circle cx="12" cy="10" r="2.3"/>',
+    down: '<path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/>',
+    up: '<path d="M12 15V4M7 8.5l5-5 5 5M5 20h14"/>',
+    file: '<path d="M6.5 3h7.5l4.5 4.5V21h-12z"/><path d="M14 3v4.5h4.5M9 13h6M9 17h6"/>',
+    sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>',
+    x: '<path d="M6 6l12 12M18 6L6 18"/>',
+    left: '<path d="M15 5l-7 7 7 7"/>',
+    right: '<path d="M9 5l7 7-7 7"/>',
+    copy: '<rect x="8.5" y="8.5" width="11.5" height="11.5" rx="2.5"/><path d="M15.5 8.5V5.5a1.5 1.5 0 00-1.5-1.5H5.5A1.5 1.5 0 004 5.5V14a1.5 1.5 0 001.5 1.5h3"/>',
+    bolt: '<path d="M13 2.5L4.5 13.5H11l-1 8 8.5-11H12z"/>',
+    trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
+    check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+    note: '<path d="M6 3.5h12v17H6z"/><path d="M9.5 8.5h5M9.5 12.5h5M9.5 16.5h3"/>',
+    alert: '<path d="M12 3.5l9.5 16.5h-19z"/><path d="M12 10v4.5M12 17.5v.01"/>',
+    save: '<path d="M5 3.5h11l3.5 3.5v13.5H5z"/><path d="M8 3.5v5h7v-5M8 20.5v-6h8v6"/>'
+  };
+  const ico = (n, cls = '') => `<svg class="i ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICO_PATHS[n] || ''}</svg>`;
+  const lbl = (n, t) => `${ico(n)}<span>${t}</span>`;
+
+  // =============================================================
+  // DATI E SALVATAGGIO LOCALE
+  // =============================================================
+  const IMP_DEFAULT = {
+    nome: '',
+    giorniLav: [1, 2, 3, 4, 5],          // 0 = domenica … 6 = sabato
+    oreGiorno: 8, pausaStd: 60, inizioStd: '08:00', fineStd: '17:00',
+    notteDa: '22:00', notteA: '06:00',
+    patrono: '', formatoOre: 'hm', tema: 'auto',
+    // Dalla busta di settembre 2026: operaio D2, paga base 1.969,04 + EDR 10,33 = 1.979,37 / 173
+    modoPaga: 'ora', pagaOraria: 11.44145, pagaMensile: 1979.37, divisore: 173,
+    aliquota: 24.6, crediti: 124.94,
+    // CCNL Metalmeccanici Industria – lavoro non a turni (art. 7)
+    mag: { str1: 25, str2: 30, sab1: 25, sab2: 50, strNott: 50, fest: 55, festNott: 75, nottOrd: 30 },
+    indGiorno: 15, indPernotto: 0, euroKm: 0, viaggioPerc: 85, viaggioCopre: true,
+    ferieAnnue: 160, parAnnue: 104, dataAssunzione: '2026-09-14'
+  };
+
+  let db = caricaDb();
+
+  function caricaDb() {
+    let d = null;
+    try { d = JSON.parse(localStorage.getItem(LS_KEY) || 'null'); } catch (e) { d = null; }
+    if (!d || typeof d !== 'object') d = {};
+    d.versione = 1;
+    d.giorni = d.giorni || {};
+    d.saldi = d.saldi || {};
+    const nuovo = !d.imp;
+    d.imp = unisciImp(d.imp || {});
+    // Migrazione dalla v1.0: valori presi dalla busta paga dove erano rimasti quelli predefiniti
+    if (!nuovo && !(d.impVer >= 2)) {
+      const I = d.imp;
+      if (I.viaggioPerc === 100) I.viaggioPerc = 85;
+      if (!I.indGiorno) I.indGiorno = 15;
+      if (I.aliquota === 28) I.aliquota = 24.6;
+      if (I.pagaMensile === 2200) { I.pagaMensile = 1979.37; I.modoPaga = 'ora'; }
+    }
+    d.impVer = 2;
+    d.live = d.live || null;
+    return d;
+  }
+  function unisciImp(i) {
+    const out = JSON.parse(JSON.stringify(IMP_DEFAULT));
+    Object.keys(i).forEach(k => { if (k !== 'mag') out[k] = i[k]; });
+    if (i.mag) Object.assign(out.mag, i.mag);
+    return out;
+  }
+  function salvaDb() {
+    try { localStorage.setItem(LS_KEY, JSON.stringify(db)); return true; }
+    catch (e) { toast('Salvataggio non riuscito: memoria del telefono piena o bloccata', 'alert'); return false; }
+  }
+  const imp = () => db.imp;
+
+  // =============================================================
+  // UTILITÀ DATE E ORE
+  // =============================================================
+  const pad = n => String(n).padStart(2, '0');
+  const dStr = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const oggiStr = () => dStr(new Date());
+  const parseD = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+  const dataIt = s => s.split('-').reverse().join('/');
+  const hhmm = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const toMin = s => { if (!s) return null; const [h, m] = s.split(':').map(Number); return isNaN(h) ? null : h * 60 + (m || 0); };
+  const GG = ['dom', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab'];
+  const GG_LUNGHI = ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'];
+  const MESI = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
+  const num = v => { if (v === '' || v == null) return null; const n = Number(String(v).replace(',', '.')); return isFinite(n) ? n : null; };
+
+  function fmtH(min, forza) {
+    min = Math.round(min || 0);
+    const f = forza || imp().formatoOre;
+    if (f === 'dec') return (min / 60).toFixed(2).replace('.', ',');
+    const neg = min < 0; min = Math.abs(min);
+    return (neg ? '-' : '') + Math.floor(min / 60) + ':' + pad(min % 60);
+  }
+  const fmtEur = v => (v || 0).toLocaleString('it-IT', { style: 'currency', currency: 'EUR' });
+  const fmtNum = (v, dec = 0) => (v || 0).toLocaleString('it-IT', { maximumFractionDigits: dec, minimumFractionDigits: dec });
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  // Festività nazionali italiane + Pasquetta + patrono
+  const cacheFestivi = {};
+  function pasqua(y) {
+    const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4;
+    const f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30;
+    const i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const mese = Math.floor((h + l - 7 * m + 114) / 31), giorno = ((h + l - 7 * m + 114) % 31) + 1;
+    return new Date(y, mese - 1, giorno);
+  }
+  function festiviAnno(y) {
+    const key = y + '|' + imp().patrono;
+    if (cacheFestivi[key]) return cacheFestivi[key];
+    const m = new Map([
+      ['01-01', 'Capodanno'], ['01-06', 'Epifania'], ['04-25', 'Liberazione'], ['05-01', 'Festa del lavoro'],
+      ['06-02', 'Festa della Repubblica'], ['08-15', 'Ferragosto'], ['11-01', 'Ognissanti'], ['12-08', 'Immacolata'],
+      ['12-25', 'Natale'], ['12-26', 'Santo Stefano']
+    ]);
+    if (y >= 2026) m.set('10-04', 'San Francesco');
+    const p = pasqua(y), pq = new Date(p); pq.setDate(p.getDate() + 1);
+    m.set(`${pad(p.getMonth() + 1)}-${pad(p.getDate())}`, 'Pasqua');
+    m.set(`${pad(pq.getMonth() + 1)}-${pad(pq.getDate())}`, 'Pasquetta');
+    const pt = String(imp().patrono || '').match(/^(\d{1,2})[\/\-.](\d{1,2})$/);
+    if (pt) m.set(`${pad(pt[2])}-${pad(pt[1])}`, 'Santo patrono');
+    cacheFestivi[key] = m;
+    return m;
+  }
+  function nomeFestivo(ds) { const d = parseD(ds); return festiviAnno(d.getFullYear()).get(ds.slice(5)) || null; }
+  // 'lav' = giorno lavorativo, 'sab' = giorno libero non festivo (es. sabato), 'fest' = domenica o festivo
+  function tipoGiorno(ds) {
+    const d = parseD(ds);
+    if (d.getDay() === 0 || nomeFestivo(ds)) return 'fest';
+    return imp().giorniLav.includes(d.getDay()) ? 'lav' : 'sab';
+  }
+
+  // =============================================================
+  // CALCOLO DI UNA GIORNATA (tutto in minuti)
+  // =============================================================
+  const ASS_NOMI = { ferie: 'Ferie', par: 'ROL/PAR', permesso: 'Permesso', malattia: 'Malattia', nonretr: 'Non retribuito', altro: 'Altro' };
+  const ASS_PAGATE = ['ferie', 'par', 'permesso'];
+
+  function isNotte(m) {
+    const da = toMin(imp().notteDa), a = toMin(imp().notteA), x = ((m % 1440) + 1440) % 1440;
+    if (da == null || a == null || da === a) return false;
+    return da > a ? (x >= da || x < a) : (x >= da && x < a);
+  }
+
+  // Orari della giornata in minuti assoluti: un orario precedente al precedente passa al giorno dopo
+  function orariAssoluti(e) {
+    const out = {}; let prev = null;
+    ['partenza', 'inizio', 'fine', 'rientro', 'arrivo'].forEach(k => {
+      let t = toMin(e[k]);
+      if (t == null) return;
+      if (prev != null) while (t < prev) t += 1440;
+      out[k] = t; prev = t;
+    });
+    return out;
+  }
+
+  // Posizione della pausa: dalle ore diurne a partire da mezzogiorno (o da metà turno)
+  function pausaInizioIdx(t, flags) {
+    const N = flags.length;
+    for (let i = 0; i < N; i++) { const m = t.inizio + i; if (m >= 720 && m < 1440 && !flags[i]) return i; }
+    return Math.floor(N / 2);
+  }
+
+  function calcolaGiorno(ds, e) {
+    const I = imp();
+    const r = {
+      tipo: tipoGiorno(ds), lav: 0, viag: 0, viagPag: 0, ord: 0, ordNott: 0,
+      str1: 0, str2: 0, sab1: 0, sab2: 0, strNott: 0, fest: 0, festNott: 0,
+      notte: 0, ass: 0, assTipo: '', mancanti: 0, ind: 0, km: 0, pernotto: false, rimbKm: 0, straord: 0
+    };
+    if (!e) return r;
+    const t = orariAssoluti(e);
+
+    // --- minuti di lavoro, ognuno marcato notte / giorno ---
+    let minuti = [];
+    const oreLavMan = num(e.oreLavoro);
+    if (oreLavMan != null) {
+      minuti = new Array(Math.round(oreLavMan * 60)).fill(false);
+    } else if (t.inizio != null && t.fine != null && t.fine > t.inizio) {
+      const N = t.fine - t.inizio;
+      const flags = new Array(N);
+      for (let i = 0; i < N; i++) flags[i] = isNotte(t.inizio + i);
+      let pausa = Math.min(Math.max(0, num(e.pausa) || 0), N);
+      const tolti = new Uint8Array(N);
+      const start = pausaInizioIdx(t, flags);
+      for (let pass = 0; pass < 2 && pausa > 0; pass++) {
+        for (let j = 0; j < N && pausa > 0; j++) {
+          const i = (start + j) % N;
+          if (tolti[i]) continue;
+          if (pass === 0 && flags[i]) continue;
+          tolti[i] = 1; pausa--;
+        }
+      }
+      for (let i = 0; i < N; i++) if (!tolti[i]) minuti.push(flags[i]);
+    }
+    r.lav = minuti.length;
+
+    // --- assenza ---
+    if (e.assTipo) { r.assTipo = e.assTipo; r.ass = Math.round((num(e.assOre) || 0) * 60); }
+
+    // --- viaggio ---
+    const oreViaMan = num(e.oreViaggio);
+    if (oreViaMan != null) r.viag = Math.round(oreViaMan * 60);
+    else {
+      if (t.partenza != null) {
+        if (t.inizio != null) r.viag += t.inizio - t.partenza;
+        else if (t.arrivo != null) r.viag += t.arrivo - t.partenza; // solo viaggio, senza lavoro
+      }
+      if (t.arrivo != null && t.inizio != null) {
+        const da = t.rientro != null ? t.rientro : t.fine;
+        if (da != null && t.arrivo > da) r.viag += t.arrivo - da;
+      }
+    }
+
+    // --- ripartizione ordinario / straordinario ---
+    const sogliaGiorno = Math.round(I.oreGiorno * 60);
+    const ordGiorno = r.tipo === 'lav' ? Math.max(0, sogliaGiorno - r.ass) : 0;
+    const BANDA = 120; // prime 2 ore
+    minuti.forEach((notte, i) => {
+      if (notte) r.notte++;
+      if (i < ordGiorno) { r.ord++; if (notte) r.ordNott++; return; }
+      const k = i - ordGiorno;
+      if (r.tipo === 'fest') { if (notte) r.festNott++; else r.fest++; }
+      else if (notte) r.strNott++;
+      else if (r.tipo === 'sab') { if (k < BANDA) r.sab1++; else r.sab2++; }
+      else { if (k < BANDA) r.str1++; else r.str2++; }
+    });
+
+    // --- viaggio pagato a parte ---
+    if (r.tipo === 'lav' && I.viaggioCopre) {
+      const buco = Math.max(0, ordGiorno - r.lav);
+      r.viagPag = Math.max(0, r.viag - Math.min(r.viag, buco));
+      r.mancanti = Math.max(0, buco - r.viag);
+    } else {
+      r.viagPag = r.viag;
+      if (r.tipo === 'lav') r.mancanti = Math.max(0, ordGiorno - r.lav);
+    }
+
+    // --- trasferta ---
+    r.km = num(e.km) || 0;
+    r.rimbKm = r.km * (Number(I.euroKm) || 0);
+    if (e.trasferta === 'giornaliera') r.ind = Number(I.indGiorno) || 0;
+    else if (e.trasferta === 'pernotto') { r.ind = Number(I.indPernotto) || 0; r.pernotto = true; }
+    else if (e.trasferta === 'custom') r.ind = num(e.indImporto) || 0;
+    r.straord = r.str1 + r.str2 + r.sab1 + r.sab2 + r.strNott + r.fest + r.festNott;
+    return r;
+  }
+
+  // Totali di un mese
+  function calcolaMese(y, m) {
+    const T = {
+      giorniLav: 0, giorniTrasf: 0, pernotti: 0, lav: 0, viag: 0, viagPag: 0, ord: 0, ordNott: 0,
+      str1: 0, str2: 0, sab1: 0, sab2: 0, strNott: 0, fest: 0, festNott: 0, straord: 0, notte: 0,
+      ass: { ferie: 0, par: 0, permesso: 0, malattia: 0, nonretr: 0, altro: 0 }, giorniMalattia: 0,
+      ind: 0, km: 0, rimbKm: 0, mancanti: 0, giorniMancanti: [], righe: [], festiviPagati: 0
+    };
+    const ultimo = new Date(y, m + 1, 0).getDate();
+    const oggi = oggiStr();
+    for (let g = 1; g <= ultimo; g++) {
+      const ds = `${y}-${pad(m + 1)}-${pad(g)}`;
+      const e = db.giorni[ds];
+      const r = calcolaGiorno(ds, e);
+      T.righe.push({ ds, e, r });
+      // Festività infrasettimanali: pagate anche se non lavorate
+      const dow = parseD(ds).getDay();
+      if (nomeFestivo(ds) && dow !== 0 && imp().giorniLav.includes(dow)) T.festiviPagati++;
+      if (!e) { if (r.tipo === 'lav' && ds < oggi) T.giorniMancanti.push(ds); continue; }
+      if (r.lav > 0) T.giorniLav++;
+      if (e.trasferta && e.trasferta !== 'no') T.giorniTrasf++;
+      if (r.pernotto) T.pernotti++;
+      ['lav', 'viag', 'viagPag', 'ord', 'ordNott', 'str1', 'str2', 'sab1', 'sab2', 'strNott', 'fest', 'festNott', 'straord', 'notte', 'ind', 'km', 'rimbKm', 'mancanti']
+        .forEach(k => T[k] += r[k]);
+      if (r.assTipo) { T.ass[r.assTipo] = (T.ass[r.assTipo] || 0) + r.ass; if (r.assTipo === 'malattia') T.giorniMalattia++; }
+    }
+    return T;
+  }
+
+  function pagaOraria() {
+    const I = imp();
+    return I.modoPaga === 'ora' ? (Number(I.pagaOraria) || 0) : (Number(I.pagaMensile) || 0) / (Number(I.divisore) || 173);
+  }
+
+  function stimaPaga(T) {
+    const I = imp(), M = I.mag;
+    const h = pagaOraria();
+    const voce = (min, perc, conBase = true) => (min / 60) * h * ((conBase ? 1 : 0) + (Number(perc) || 0) / 100);
+    const base = [];
+    if (I.modoPaga === 'ora') {
+      const assPag = ASS_PAGATE.reduce((s, k) => s + (T.ass[k] || 0), 0);
+      base.push({ k: 'Lavoro ordinario', min: T.ord, eur: (T.ord / 60) * h });
+      if (assPag) base.push({ k: 'Ferie e permessi retribuiti', min: assPag, eur: (assPag / 60) * h });
+      if (T.festiviPagati) base.push({ k: `Festività infrasettimanali (${T.festiviPagati})`, min: T.festiviPagati * I.oreGiorno * 60, eur: T.festiviPagati * I.oreGiorno * h });
+    } else {
+      base.push({ k: 'Retribuzione mensile', min: 0, eur: Number(I.pagaMensile) || 0 });
+    }
+    const v = [
+      { k: 'Straordinario feriale, prime 2 ore', p: M.str1, min: T.str1, eur: voce(T.str1, M.str1) },
+      { k: 'Straordinario feriale, ore successive', p: M.str2, min: T.str2, eur: voce(T.str2, M.str2) },
+      { k: 'Sabato, prime 2 ore', p: M.sab1, min: T.sab1, eur: voce(T.sab1, M.sab1) },
+      { k: 'Sabato, ore successive', p: M.sab2, min: T.sab2, eur: voce(T.sab2, M.sab2) },
+      { k: 'Straordinario notturno', p: M.strNott, min: T.strNott, eur: voce(T.strNott, M.strNott) },
+      { k: 'Festivo', p: M.fest, min: T.fest, eur: voce(T.fest, M.fest) },
+      { k: 'Festivo notturno', p: M.festNott, min: T.festNott, eur: voce(T.festNott, M.festNott) },
+      { k: 'Maggiorazione notturno in orario', p: M.nottOrd, min: T.ordNott, eur: voce(T.ordNott, M.nottOrd, false) },
+      { k: 'Ore di viaggio', p: I.viaggioPerc, pAss: true, min: T.viagPag, eur: (T.viagPag / 60) * h * (Number(I.viaggioPerc) || 0) / 100 }
+    ];
+    const trattenuta = I.modoPaga === 'mese' ? (T.ass.nonretr / 60) * h : 0;
+    const imponibile = base.reduce((s, x) => s + x.eur, 0) + v.reduce((s, x) => s + x.eur, 0) - trattenuta;
+    const trattenute = imponibile * (Number(I.aliquota) || 0) / 100;
+    const crediti = imponibile > 0 ? (Number(I.crediti) || 0) : 0;
+    const netto = imponibile - trattenute + crediti + T.ind + T.rimbKm;
+    return { h, base, voci: v, trattenuta, imponibile, trattenute, crediti, netto, lordo: imponibile + T.ind + T.rimbKm };
+  }
+
+  // Mesi di maturazione nell'anno y fino al mese mFino compreso, partendo dall'assunzione.
+  // Il mese di assunzione conta intero se restano almeno 15 giorni di calendario.
+  function mesiMaturati(y, mFino) {
+    const ass = imp().dataAssunzione;
+    if (!ass) return mFino + 1;
+    const d = parseD(ass), hy = d.getFullYear(), hm = d.getMonth();
+    if (hy > y) return 0;
+    let inizio = 0;
+    if (hy === y) {
+      const giorniNelMese = new Date(hy, hm + 1, 0).getDate();
+      inizio = (giorniNelMese - d.getDate() + 1) >= 15 ? hm : hm + 1;
+    }
+    return Math.max(0, mFino - inizio + 1);
+  }
+
+  // Saldi ferie/PAR dell'anno fino al mese indicato
+  function saldiAnno(y, mFino) {
+    const I = imp(), s = db.saldi[y] || { ferie: 0, par: 0 };
+    let ferieGod = 0, parGod = 0, ferieProg = 0, parProg = 0;
+    const fineMese = `${y}-${pad(mFino + 1)}-31`;
+    Object.keys(db.giorni).forEach(ds => {
+      if (!ds.startsWith(y + '-')) return;
+      const e = db.giorni[ds];
+      if (!e.assTipo) return;
+      const ore = num(e.assOre) || 0;
+      const dopo = ds > fineMese;
+      if (e.assTipo === 'ferie') { if (dopo) ferieProg += ore; else ferieGod += ore; }
+      if (e.assTipo === 'par') { if (dopo) parProg += ore; else parGod += ore; }
+    });
+    const mesi = mesiMaturati(y, mFino);
+    const ferieMat = (Number(I.ferieAnnue) || 0) / 12 * mesi;
+    const parMat = (Number(I.parAnnue) || 0) / 12 * mesi;
+    return {
+      assuntoQuest: !!I.dataAssunzione && parseD(I.dataAssunzione).getFullYear() === y, mesi,
+      ferieIniz: Number(s.ferie) || 0, parIniz: Number(s.par) || 0, ferieMat, parMat, ferieGod, parGod, ferieProg, parProg,
+      ferieRes: (Number(s.ferie) || 0) + ferieMat - ferieGod, parRes: (Number(s.par) || 0) + parMat - parGod
+    };
+  }
+
+  // =============================================================
+  // STRISCIA DELLA GIORNATA
+  // =============================================================
+  function stripHTML(e, chiaro, oraAdesso) {
+    const t = orariAssoluti(e);
+    const ks = Object.keys(t);
+    if (!ks.length) return '';
+    const vals = ks.map(k => t[k]);
+    if (oraAdesso != null) vals.push(oraAdesso);
+    let a = Math.min(...vals), b = Math.max(...vals);
+    a = Math.floor(Math.min(a, 6 * 60) / 60) * 60;
+    b = Math.ceil(Math.max(b, 20 * 60) / 60) * 60;
+    const W = b - a, pct = m => ((m - a) / W * 100).toFixed(2) + '%', wid = (x, y) => ((y - x) / W * 100).toFixed(2) + '%';
+    let h = '';
+    // fasce notturne
+    for (let m = a; m < b; m += 60) if (isNotte(m)) h += `<i class="seg-n" style="left:${pct(m)};width:${wid(m, m + 60)}"></i>`;
+    // viaggio
+    if (t.partenza != null) {
+      const fine = t.inizio != null ? t.inizio : t.arrivo;
+      if (fine != null) h += `<i class="seg-t" style="left:${pct(t.partenza)};width:${wid(t.partenza, fine)}"></i>`;
+    }
+    if (t.arrivo != null && t.inizio != null) {
+      const da = t.rientro != null ? t.rientro : t.fine;
+      if (da != null && t.arrivo > da) h += `<i class="seg-t" style="left:${pct(da)};width:${wid(da, t.arrivo)}"></i>`;
+    }
+    // lavoro, con la parte oltre le ore ordinarie in ambra
+    if (t.inizio != null && t.fine != null && t.fine > t.inizio) {
+      const pausa = Math.min(num(e.pausa) || 0, t.fine - t.inizio);
+      h += `<i class="seg-w" style="left:${pct(t.inizio)};width:${wid(t.inizio, t.fine)}"></i>`;
+      const ds = e.__ds;
+      const tipo = ds ? tipoGiorno(ds) : 'lav';
+      const ordMin = tipo === 'lav' ? Math.max(0, imp().oreGiorno * 60 - (e.assTipo ? (num(e.assOre) || 0) * 60 : 0)) : 0;
+      const fineOrd = t.inizio + ordMin + pausa;
+      if (fineOrd < t.fine) h += `<i class="seg-o" style="left:${pct(fineOrd)};width:${wid(fineOrd, t.fine)}"></i>`;
+      if (pausa > 0) {
+        const N = t.fine - t.inizio, flags = []; for (let i = 0; i < N; i++) flags.push(isNotte(t.inizio + i));
+        const ps = t.inizio + pausaInizioIdx(t, flags);
+        h += `<i class="seg-p" style="left:${pct(ps)};width:${wid(ps, Math.min(t.fine, ps + pausa))}"></i>`;
+      }
+    }
+    if (oraAdesso != null) h += `<i class="now" style="left:${pct(oraAdesso)}"></i>`;
+    let tk = '';
+    const passo = W > 18 * 60 ? 360 : 180;
+    for (let m = Math.ceil(a / passo) * passo; m <= b; m += passo) tk += `<span style="left:${pct(m)}">${pad((m / 60) % 24)}</span>`;
+    return `<div class="strip ${chiaro ? 'light' : ''}"><div class="bar">${h}</div><div class="ticks">${tk}</div></div>`;
+  }
+
+  // =============================================================
+  // NAVIGAZIONE
+  // =============================================================
+  let tabCorrente = 'oggi';
+  let meseSel = (() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() }; })();
+  const nomeMese = (y, m) => `${MESI[m]} ${y}`;
+
+  function renderTop() {
+    const k = $('top-kicker'), t = $('top-title'), c = $('top-ctl');
+    if (tabCorrente === 'oggi') {
+      const L = db.live, ds = L && L.data ? L.data : oggiStr(), d = parseD(ds);
+      k.textContent = GG_LUNGHI[d.getDay()];
+      t.textContent = `${d.getDate()} ${MESI[d.getMonth()]}`;
+      c.innerHTML = '';
+    } else if (tabCorrente === 'giorni' || tabCorrente === 'riepilogo') {
+      k.textContent = tabCorrente === 'giorni' ? 'Giorni' : 'Riepilogo';
+      t.textContent = nomeMese(meseSel.y, meseSel.m);
+      c.innerHTML = `<button class="icon-btn" onclick="cambiaMese(-1)" aria-label="Mese precedente">${ico('left')}</button><button class="icon-btn" onclick="cambiaMese(1)" aria-label="Mese successivo">${ico('right')}</button>`;
+    } else {
+      k.textContent = `Segna Ore ${APP_VERSION}`;
+      t.textContent = 'Impostazioni';
+      c.innerHTML = '';
+    }
+  }
+
+  function vai(tab) {
+    tabCorrente = tab;
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('on'));
+    $('view-' + tab).classList.add('on');
+    document.querySelectorAll('nav.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
+    if (tab === 'oggi') renderOggi();
+    if (tab === 'giorni') renderGiorni();
+    if (tab === 'riepilogo') renderRiepilogo();
+    if (tab === 'imp') renderImpostazioni();
+    renderTop();
+    window.scrollTo(0, 0);
+  }
+  function cambiaMese(delta) {
+    let { y, m } = meseSel; m += delta;
+    if (m < 0) { m = 11; y--; } if (m > 11) { m = 0; y++; }
+    meseSel = { y, m };
+    if (tabCorrente === 'giorni') renderGiorni(); else renderRiepilogo();
+    renderTop();
+  }
+
+  let toastTimer = null;
+  function toast(msg, icona = 'check') {
+    const t = $('toast'); t.innerHTML = lbl(icona, esc(msg)); t.classList.remove('hidden');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.add('hidden'), 2600);
+  }
+  function chiudiModal(id) { $(id).classList.add('hidden'); document.body.style.overflow = ''; }
+  function apriModal(id) { $(id).classList.remove('hidden'); document.body.style.overflow = 'hidden'; }
+
+  function aggiornaDatalist() {
+    const conteggio = {};
+    Object.values(db.giorni).forEach(e => { if (e.localita) conteggio[e.localita] = (conteggio[e.localita] || 0) + 1; });
+    $('dl-localita').innerHTML = Object.keys(conteggio).sort((a, b) => conteggio[b] - conteggio[a]).slice(0, 40)
+      .map(l => `<option value="${esc(l)}">`).join('');
+  }
+
+  function applicaTema() {
+    const t = imp().tema;
+    if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+    else delete document.documentElement.dataset.theme;
+  }
+
+  // =============================================================
+  // CRONOMETRO (OGGI)
+  // Stati: PRONTO → ANDATA → LAVORO ⇄ PAUSA → RIENTRO → FINITO
+  // =============================================================
+  function nuovoLive() {
+    return { data: oggiStr(), stato: 'PRONTO', t: {}, pausaMin: 0, pausaInizio: null, localita: '', km: '', trasferta: 'no', indImporto: '', note: '' };
+  }
+  function live() { if (!db.live) db.live = nuovoLive(); return db.live; }
+
+  // Converte il cronometro in una giornata (le fasi ancora aperte arrivano fino ad "adesso")
+  function liveComeGiorno(L, perSalvare) {
+    const now = new Date();
+    const T = k => L.t[k] ? hhmm(new Date(L.t[k])) : '';
+    const e = {
+      partenza: T('partenza'), inizio: T('inizio'), fine: T('fine'), arrivo: T('arrivo'), rientro: '',
+      pausa: L.pausaMin + (L.stato === 'PAUSA' && L.pausaInizio ? Math.max(0, Math.round((now - new Date(L.pausaInizio)) / 60000)) : 0),
+      localita: L.localita, km: L.km, trasferta: L.trasferta, indImporto: L.indImporto, note: L.note,
+      assTipo: '', assOre: '', oreLavoro: '', oreViaggio: ''
+    };
+    if (!perSalvare) {
+      if (L.stato === 'ANDATA' && !e.inizio) e.inizio = hhmm(now);
+      if (['LAVORO', 'PAUSA'].includes(L.stato)) e.fine = hhmm(now);
+      if (L.stato === 'RIENTRO') e.arrivo = hhmm(now);
+    }
+    return e;
+  }
+
+  function azione(cmd) {
+    const L = live();
+    const now = new Date().toISOString();
+    if (L.stato === 'PRONTO') {
+      const esiste = db.giorni[oggiStr()];
+      if (esiste && !confirm('Per oggi c\'è già una giornata registrata. Il cronometro la sostituirà quando chiudi. Continuare?')) return;
+      L.data = oggiStr();
+    }
+    switch (cmd) {
+      case 'PARTO': L.t.partenza = now; L.stato = 'ANDATA'; break;
+      case 'INIZIO': L.t.inizio = now; L.stato = 'LAVORO'; break;
+      case 'PAUSA': L.pausaInizio = now; L.stato = 'PAUSA'; break;
+      case 'FINE_PAUSA':
+        L.pausaMin += Math.max(0, Math.round((new Date() - new Date(L.pausaInizio)) / 60000));
+        L.pausaInizio = null; L.stato = 'LAVORO'; break;
+      case 'RIENTRO': L.t.fine = now; L.stato = 'RIENTRO'; break;
+      case 'FINE': L.t.fine = now; chiudiGiornataLive(); return;
+      case 'A_CASA': L.t.arrivo = now; chiudiGiornataLive(); return;
+      case 'SOLO_VIAGGIO': L.t.arrivo = now; chiudiGiornataLive(); return;
+      case 'RIAPRI':
+        if (L.t.arrivo && L.t.fine) { delete L.t.arrivo; L.stato = 'RIENTRO'; }
+        else if (L.t.arrivo) { delete L.t.arrivo; L.stato = 'ANDATA'; }
+        else { delete L.t.fine; L.stato = 'LAVORO'; }
+        if (L.salvato) { delete db.giorni[L.data]; L.salvato = false; }
+        break;
+      case 'NUOVA': db.live = nuovoLive(); break;
+    }
+    salvaDb(); renderOggi();
+  }
+
+  function chiudiGiornataLive() {
+    const L = live();
+    L.stato = 'FINITO';
+    const e = liveComeGiorno(L, true);
+    e.fonte = 'cronometro'; e.agg = new Date().toISOString();
+    db.giorni[L.data] = e;
+    L.salvato = true;
+    salvaDb(); aggiornaDatalist(); renderOggi();
+    toast('Giornata salvata');
+  }
+
+  function salvaDettagliLive() {
+    const L = live();
+    L.localita = $('live-localita').value.trim();
+    L.km = $('live-km').value;
+    L.trasferta = $('live-trasferta').value;
+    L.indImporto = $('live-ind').value;
+    L.note = $('live-note').value;
+    $('live-ind-wrap').classList.toggle('hidden', L.trasferta !== 'custom');
+    if (L.stato === 'FINITO' && db.giorni[L.data]) {
+      Object.assign(db.giorni[L.data], { localita: L.localita, km: L.km, trasferta: L.trasferta, indImporto: L.indImporto, note: L.note });
+    }
+    salvaDb();
+    aggiornaTimer();
+  }
+
+  function azzeraLive() {
+    if (!confirm('Azzerare il cronometro di oggi? Le giornate già salvate non vengono toccate.')) return;
+    db.live = nuovoLive(); salvaDb(); renderOggi();
+  }
+
+  function apriCorreggiLive() {
+    const L = live();
+    const T = k => L.t[k] ? hhmm(new Date(L.t[k])) : '';
+    $('lv-partenza').value = T('partenza'); $('lv-inizio').value = T('inizio');
+    $('lv-fine').value = T('fine'); $('lv-arrivo').value = T('arrivo');
+    $('lv-pausa').value = L.pausaMin || '';
+    apriModal('modal-live');
+  }
+  function applicaCorreggiLive() {
+    const L = live();
+    if (L.stato === 'PRONTO') L.data = oggiStr();
+    const base = parseD(L.data);
+    const v = { partenza: $('lv-partenza').value, inizio: $('lv-inizio').value, fine: $('lv-fine').value, arrivo: $('lv-arrivo').value };
+    const abs = orariAssoluti(v);
+    const iso = k => { if (abs[k] == null) return undefined; const d = new Date(base); d.setMinutes(abs[k]); return d.toISOString(); };
+    const nuovoT = {};
+    ['partenza', 'inizio', 'fine', 'arrivo'].forEach(k => { const x = iso(k); if (x) nuovoT[k] = x; });
+    for (const k of Object.keys(nuovoT)) {
+      if (new Date(nuovoT[k]) > new Date(Date.now() + 60000)) { alert('Un orario è nel futuro: controllalo.'); return; }
+    }
+    L.t = nuovoT;
+    L.pausaMin = Math.max(0, num($('lv-pausa').value) || 0);
+    L.pausaInizio = null;
+    if (L.t.arrivo) L.stato = 'FINITO';
+    else if (L.t.fine && !L.t.partenza) L.stato = 'FINITO';
+    else if (L.t.fine) L.stato = 'RIENTRO';
+    else if (L.t.inizio) L.stato = 'LAVORO';
+    else if (L.t.partenza) L.stato = 'ANDATA';
+    else L.stato = 'PRONTO';
+    chiudiModal('modal-live');
+    if (L.stato === 'FINITO') chiudiGiornataLive();
+    else { if (L.salvato) { delete db.giorni[L.data]; L.salvato = false; } salvaDb(); renderOggi(); toast('Cronometro corretto'); }
+  }
+
+  function chipTipo(ds) {
+    const t = tipoGiorno(ds), f = nomeFestivo(ds);
+    if (t === 'fest') return `<span class="chip c-red">${esc(f || 'Domenica')}, festivo</span>`;
+    if (t === 'sab') return `<span class="chip c-indigo">Giorno libero, tutto straordinario</span>`;
+    return `<span class="chip c-green">Lavorativo, ${fmtH(imp().oreGiorno * 60)} ordinarie</span>`;
+  }
+  function testoTipo(ds) {
+    const t = tipoGiorno(ds), f = nomeFestivo(ds);
+    if (t === 'fest') return `${f || 'Domenica'}: festivo`;
+    if (t === 'sab') return 'Giorno libero: tutto straordinario';
+    return `Giorno lavorativo, ${fmtH(imp().oreGiorno * 60, 'hm')} ordinarie`;
+  }
+
+  function renderOggi() {
+    const L = live();
+    if (L.stato === 'PRONTO' && L.data !== oggiStr()) L.data = oggiStr();
+    if (L.stato === 'FINITO' && L.data !== oggiStr()) { db.live = nuovoLive(); salvaDb(); return renderOggi(); }
+    const ds = L.data;
+    $('oggi-tipo').textContent = testoTipo(ds);
+
+    $('live-localita').value = L.localita || '';
+    $('live-km').value = L.km || '';
+    $('live-trasferta').value = L.trasferta || 'no';
+    $('live-ind').value = L.indImporto || '';
+    $('live-note').value = L.note || '';
+    $('live-ind-wrap').classList.toggle('hidden', L.trasferta !== 'custom');
+
+    const st = { PRONTO: ['Pronto', ''], ANDATA: ['In viaggio', 's-travel'], LAVORO: ['Al lavoro', 's-run'], PAUSA: ['In pausa', 's-pause'], RIENTRO: ['Rientro', 's-travel'], FINITO: ['Giornata chiusa', 's-done'] }[L.stato];
+    $('oggi-stato').textContent = st[0];
+    $('oggi-stato').className = 'state ' + st[1];
+
+    const A = $('oggi-azioni');
+    const B = (cmd, cls, icona, txt) => `<button class="btn ${cls}" onclick="azione('${cmd}')">${lbl(icona, txt)}</button>`;
+    if (L.stato === 'PRONTO') A.innerHTML = B('PARTO', '', 'car', 'Parto dalla sede') + B('INIZIO', 'go', 'play', 'Inizio lavoro, senza viaggio');
+    else if (L.stato === 'ANDATA') A.innerHTML = B('INIZIO', 'go', 'play', 'Arrivato, inizio lavoro') + B('SOLO_VIAGGIO', 'soft', 'sede', 'Chiudi: solo viaggio');
+    else if (L.stato === 'LAVORO') A.innerHTML = `<div class="g2">${B('PAUSA', 'warn', 'pause', 'Pausa')}${B('RIENTRO', '', 'car', 'Fine e rientro')}</div>` + B('FINE', 'stop', 'stop', 'Fine lavoro, sono già in sede');
+    else if (L.stato === 'PAUSA') A.innerHTML = B('FINE_PAUSA', 'go', 'play', 'Riprendo il lavoro');
+    else if (L.stato === 'RIENTRO') A.innerHTML = B('A_CASA', 'ink', 'sede', 'Rientrato in sede');
+    else if (L.stato === 'FINITO') A.innerHTML = `<div class="note n-green">${ico('check')}<span>Giornata chiusa e salvata</span></div>`
+      + `<div class="g2">${B('RIAPRI', 'soft sm', 'undo', 'Riapri')}<button class="btn soft-cobalt sm" onclick="apriEditor('${ds}')">${lbl('edit', 'Modifica')}</button></div>`;
+
+    $('btn-azzera-live').classList.toggle('hidden', L.stato === 'PRONTO' || L.stato === 'FINITO');
+    $('btn-correggi-live').classList.toggle('hidden', L.stato === 'FINITO');
+
+    const salvato = db.giorni[oggiStr()];
+    const mostraSalvato = salvato && L.stato === 'PRONTO';
+    $('card-oggi-salvato').classList.toggle('hidden', !mostraSalvato);
+    $('card-dettagli').classList.toggle('hidden', !!mostraSalvato);
+    if (mostraSalvato) {
+      const r = calcolaGiorno(oggiStr(), salvato);
+      $('oggi-salvato-info').innerHTML =
+        kv('Lavoro', fmtH(r.lav)) + (r.viag ? kv('Viaggio', fmtH(r.viag)) : '') + (r.straord ? kv('Straordinario', fmtH(r.straord)) : '') +
+        (r.assTipo ? kv(ASS_NOMI[r.assTipo], fmtH(r.ass)) : '') + (salvato.localita ? kv('Località', esc(salvato.localita)) : '') +
+        `<div style="padding:12px 16px;border-top:1px solid var(--line)"><button class="btn sm soft-cobalt" onclick="apriEditor('${oggiStr()}')">${lbl('edit', 'Modifica il giorno')}</button></div>`;
+    }
+
+    aggiornaTimer();
+    renderBannerBackup();
+    if (tabCorrente === 'oggi') renderTop();
+  }
+
+  function setRing(id, frac, r) {
+    const C = 2 * Math.PI * r, el = $(id);
+    el.style.strokeDasharray = C;
+    el.style.strokeDashoffset = C * (1 - Math.max(0, Math.min(1, frac)));
+    el.style.opacity = frac > 0 ? 1 : 0;
+  }
+
+  function aggiornaTimer() {
+    const L = live();
+    const T = k => L.t[k] ? hhmm(new Date(L.t[k])) : '–';
+    $('t-partenza').textContent = T('partenza'); $('t-inizio').textContent = T('inizio');
+    $('t-fine').textContent = T('fine'); $('t-arrivo').textContent = T('arrivo');
+
+    const e = liveComeGiorno(L, L.stato === 'FINITO');
+    e.__ds = L.data;
+    const r = calcolaGiorno(L.data, (L.stato === 'PRONTO') ? null : e);
+    const ordTarget = r.tipo === 'lav' ? imp().oreGiorno * 60 : 0;
+    $('oggi-lavoro').textContent = fmtH(r.lav, 'hm');
+    $('lg-ord').textContent = fmtH(r.ord, 'hm');
+    $('lg-str').textContent = fmtH(r.straord, 'hm');
+    $('lg-via').textContent = fmtH(r.viag, 'hm');
+    setRing('ring-ord', ordTarget ? r.ord / ordTarget : 0, 104);
+    setRing('ring-str', r.straord / 240, 84);
+    setRing('ring-via', r.viag / 240, 69);
+
+    let cap = 'ore di lavoro';
+    const pausa = num(e.pausa) || 0;
+    if (L.stato === 'PAUSA') cap = `in pausa da ${Math.max(0, Math.round((new Date() - new Date(L.pausaInizio)) / 60000))} min`;
+    else if (L.t.inizio && L.stato !== 'FINITO' && r.tipo === 'lav' && r.ord < ordTarget) {
+      const fineTarget = new Date(new Date(L.t.inizio).getTime() + (ordTarget + pausa) * 60000);
+      cap = `ordinarie fino alle ${hhmm(fineTarget)}`;
+    } else if (L.stato === 'ANDATA') cap = `in viaggio da ${fmtH(r.viag, 'hm')}`;
+    else if (L.stato === 'RIENTRO') cap = 'rientro in corso';
+    else if (r.straord > 0 && L.stato !== 'FINITO') cap = `+${fmtH(r.straord, 'hm')} di straordinario`;
+    else if (L.stato === 'FINITO') cap = `lavoro${r.viag ? ` e ${fmtH(r.viag, 'hm')} di viaggio` : ''}`;
+    $('oggi-cap').textContent = cap;
+
+    const now = new Date();
+    let adesso = null;
+    if (!['PRONTO', 'FINITO'].includes(L.stato)) {
+      adesso = now.getHours() * 60 + now.getMinutes();
+      const t0 = orariAssoluti(e); const first = Math.min(...Object.values(t0));
+      while (adesso < first) adesso += 1440;
+    }
+    $('oggi-strip').innerHTML = L.stato === 'PRONTO' ? '' : stripHTML(e, false, adesso);
+
+    const av = $('banner-backup');
+    if (L.data !== oggiStr() && L.stato !== 'FINITO') {
+      av.innerHTML = `<div class="note n-red" style="border-radius:14px;padding:12px 14px;display:flex;gap:10px;font-size:14px;font-weight:600">${ico('alert')}<span>Il cronometro è aperto dal ${esc(dataIt(L.data))}. Se hai dimenticato di chiuderlo, correggi gli orari.</span></div>`;
+      av.classList.remove('hidden');
+    }
+  }
+
+  // =============================================================
+  // ELENCO GIORNI
+  // =============================================================
+  function righeDescr(e, r) {
+    const parti = [];
+    if (e.inizio || e.fine) parti.push(`${e.inizio || '?'}–${e.fine || '?'}`);
+    else if (num(e.oreLavoro) != null) parti.push('Ore a mano');
+    if (e.localita) parti.push(esc(e.localita));
+    return parti.join(', ');
+  }
+  function miniBar(r) {
+    const S = 12 * 60, w = m => (Math.min(m, S) / S * 100).toFixed(1) + '%';
+    let x = 0, h = '';
+    const add = (m, col) => { if (m <= 0) return; h += `<i style="left:${w(x)};width:${w(m)};background:${col}"></i>`; x += m; };
+    add(r.ord, 'var(--cobalt)'); add(r.straord, 'var(--amber)');
+    if (ASS_PAGATE.includes(r.assTipo) || r.assTipo === 'malattia') add(r.ass, 'var(--green)');
+    add(r.viag, 'color-mix(in srgb, var(--indigo) 55%, transparent)');
+    return `<div class="mini">${h}<span class="m8" style="left:${w(imp().oreGiorno * 60)}"></span></div>`;
+  }
+
+  function renderGiorni() {
+    const { y, m } = meseSel;
+    const T = calcolaMese(y, m);
+    $('giorni-stats').innerHTML = `
+      <div><div class="k">Lavoro</div><div class="v cobalt">${fmtH(T.lav)}</div></div>
+      <div><div class="k">Straordinario</div><div class="v amber">${fmtH(T.straord)}</div></div>
+      <div><div class="k">Viaggio</div><div class="v">${fmtH(T.viag)}</div></div>`;
+
+    const manca = $('giorni-manca');
+    if (T.giorniMancanti.length) {
+      manca.classList.remove('hidden');
+      const n = T.giorniMancanti.length;
+      manca.innerHTML = `<div class="note n-amber" style="border-radius:14px;padding:12px 14px;display:flex;gap:10px;font-size:14px;font-weight:600">${ico('alert')}<span>${n === 1 ? '1 giorno lavorativo passato è vuoto' : `${n} giorni lavorativi passati sono vuoti`}. Toccali per compilarli.</span></div>`;
+    } else manca.classList.add('hidden');
+
+    const oggi = oggiStr();
+    let html = '', sett = { lav: 0, str: 0, viag: 0, n: 0 };
+    const chiudiSett = () => {
+      if (sett.n) html += `<div class="week"><span>Settimana</span><span>lavoro <b>${fmtH(sett.lav)}</b>, straord. <b>${fmtH(sett.str)}</b>, viaggio <b>${fmtH(sett.viag)}</b></span></div>`;
+      sett = { lav: 0, str: 0, viag: 0, n: 0 };
+    };
+    T.righe.forEach(({ ds, e, r }) => {
+      const d = parseD(ds);
+      const cls = ['day', r.tipo === 'fest' ? 'fest' : '', r.tipo === 'sab' ? 'sab' : '', !e ? 'vuoto' : '', ds === oggi ? 'today' : ''];
+      let info, tot = '';
+      if (e) {
+        sett.lav += r.lav; sett.str += r.straord; sett.viag += r.viag; sett.n++;
+        const badges = [];
+        if (r.assTipo) badges.push(`<span class="chip c-green">${ASS_NOMI[r.assTipo]} ${fmtH(r.ass)}</span>`);
+        if (r.viag) badges.push(`<span class="chip c-indigo">${ico('car')}${fmtH(r.viag)}</span>`);
+        if (e.trasferta === 'pernotto') badges.push(`<span class="chip c-cobalt">${ico('bed')}pernotto</span>`);
+        else if (e.trasferta && e.trasferta !== 'no') badges.push('<span class="chip c-cobalt">trasferta</span>');
+        if (r.notte) badges.push(`<span class="chip c-indigo">${ico('moon')}${fmtH(r.notte)}</span>`);
+        if (r.mancanti > 0) badges.push(`<span class="chip c-red">−${fmtH(r.mancanti)}</span>`);
+        const l1 = righeDescr(e, r) || (r.assTipo ? ASS_NOMI[r.assTipo] : (r.viag ? 'Solo viaggio' : 'Giorno registrato'));
+        info = `<div class="l1">${l1}</div>${badges.length ? `<div class="l2">${badges.join('')}</div>` : ''}${e.note ? `<div class="l2" style="color:var(--ink-3)">${esc(e.note)}</div>` : ''}${miniBar(r)}`;
+        tot = `<div class="h">${r.lav ? fmtH(r.lav) : (r.ass ? fmtH(r.ass) : '–')}</div>${r.straord ? `<div class="x">+${fmtH(r.straord)}</div>` : ''}`;
+      } else {
+        const f = nomeFestivo(ds);
+        const manca = r.tipo === 'lav' && ds < oggi;
+        if (manca) cls.push('manca');
+        info = `<div class="l1">${f ? esc(f) : (r.tipo === 'lav' ? (manca ? 'Da compilare' : '') : 'Riposo')}</div>`;
+        tot = `<span class="add">${ico('plus')}</span>`;
+      }
+      html += `<button class="${cls.join(' ')}" onclick="apriEditor('${ds}')">
+        <div class="d"><div class="n">${d.getDate()}</div><div class="w">${GG[d.getDay()]}</div></div>
+        <div class="info">${info}</div><div class="tot">${tot}</div></button>`;
+      if (d.getDay() === 0) chiudiSett();
+    });
+    chiudiSett();
+    $('giorni-lista').innerHTML = html;
+  }
+
+  // =============================================================
+  // EDITOR GIORNO (aggiunta / correzione)
+  // =============================================================
+  let edOrig = null;
+
+  function apriEditor(ds) {
+    if (!ds) {
+      const T = calcolaMese(meseSel.y, meseSel.m);
+      ds = T.giorniMancanti[0] || oggiStr();
+    }
+    const e = db.giorni[ds];
+    edOrig = e ? ds : null;
+    $('ed-data').value = ds;
+    $('ed-titolo').textContent = e ? 'Correggi giorno' : 'Aggiungi giorno';
+    riempiEditor(e || {});
+    $('ed-elimina').classList.toggle('hidden', !e);
+    edDataCambiata(true);
+    apriModal('modal-editor');
+    $('ed-body').scrollTop = 0;
+  }
+  function riempiEditor(e) {
+    ['partenza', 'inizio', 'fine', 'arrivo', 'rientro'].forEach(k => $('ed-' + k).value = e[k] || '');
+    $('ed-pausa').value = e.pausa != null && e.pausa !== '' ? e.pausa : '';
+    $('ed-ore-lavoro').value = e.oreLavoro != null ? e.oreLavoro : '';
+    $('ed-ore-viaggio').value = e.oreViaggio != null ? e.oreViaggio : '';
+    $('ed-override-box').open = (num(e.oreLavoro) != null || num(e.oreViaggio) != null);
+    $('ed-ass-tipo').value = e.assTipo || '';
+    $('ed-ass-ore').value = e.assOre != null ? e.assOre : '';
+    $('ed-localita').value = e.localita || '';
+    $('ed-km').value = e.km || '';
+    $('ed-trasferta').value = e.trasferta || 'no';
+    $('ed-ind').value = e.indImporto || '';
+    $('ed-note').value = e.note || '';
+    $('ed-ind-wrap').classList.toggle('hidden', $('ed-trasferta').value !== 'custom');
+  }
+  function leggiEditor() {
+    const v = id => $(id).value;
+    return {
+      partenza: v('ed-partenza'), inizio: v('ed-inizio'), fine: v('ed-fine'), arrivo: v('ed-arrivo'), rientro: v('ed-rientro'),
+      pausa: num(v('ed-pausa')) != null ? num(v('ed-pausa')) : '',
+      oreLavoro: num(v('ed-ore-lavoro')) != null ? num(v('ed-ore-lavoro')) : '',
+      oreViaggio: num(v('ed-ore-viaggio')) != null ? num(v('ed-ore-viaggio')) : '',
+      assTipo: v('ed-ass-tipo'), assOre: v('ed-ass-tipo') ? (num(v('ed-ass-ore')) || 0) : '',
+      localita: v('ed-localita').trim(), km: v('ed-km'), trasferta: v('ed-trasferta'), indImporto: v('ed-ind'), note: v('ed-note').trim()
+    };
+  }
+  function edDataCambiata(silenzioso) {
+    const ds = $('ed-data').value;
+    if (!ds) return;
+    $('ed-tipo-giorno').innerHTML = chipTipo(ds);
+    if (!silenzioso && db.giorni[ds] && ds !== edOrig) toast('Questo giorno esiste già: salvando verrà sostituito', 'alert');
+    edAnteprima();
+  }
+  function edGiornataStandard() {
+    const I = imp();
+    $('ed-inizio').value = I.inizioStd || '08:00';
+    $('ed-fine').value = I.fineStd || '17:00';
+    $('ed-pausa').value = I.pausaStd || 0;
+    edAnteprima();
+  }
+  function edCopiaPrecedente() {
+    const ds = $('ed-data').value;
+    const prec = Object.keys(db.giorni).filter(k => k < ds && (db.giorni[k].inizio || (db.giorni[k].oreLavoro !== '' && db.giorni[k].oreLavoro != null))).sort().pop();
+    if (!prec) { toast('Nessun giorno precedente con ore da copiare', 'alert'); return; }
+    const e = Object.assign({}, db.giorni[prec]);
+    e.note = ''; e.assTipo = ''; e.assOre = '';
+    riempiEditor(e);
+    edAnteprima();
+    toast('Copiato dal ' + dataIt(prec), 'copy');
+  }
+  function edAssenzaCambiata() {
+    const tipo = $('ed-ass-tipo').value;
+    if (tipo && !num($('ed-ass-ore').value)) {
+      const r = calcolaGiorno($('ed-data').value, leggiEditor());
+      const resto = Math.max(0, imp().oreGiorno * 60 - r.lav);
+      $('ed-ass-ore').value = +(resto / 60).toFixed(2) || imp().oreGiorno;
+    }
+    if (!tipo) $('ed-ass-ore').value = '';
+    edAnteprima();
+  }
+  function edTrasfertaCambiata() {
+    $('ed-ind-wrap').classList.toggle('hidden', $('ed-trasferta').value !== 'custom');
+    edAnteprima();
+  }
+  function edAnteprima() {
+    const ds = $('ed-data').value;
+    if (!ds) return;
+    const e = leggiEditor(); e.__ds = ds;
+    const r = calcolaGiorno(ds, e);
+    const parti = [`Lavoro <b>${fmtH(r.lav)}</b>`, `ordinarie <b>${fmtH(r.ord)}</b>`];
+    if (r.straord) parti.push(`straordinario <b>${fmtH(r.straord)}</b>`);
+    if (r.notte) parti.push(`notturne <b>${fmtH(r.notte)}</b>`);
+    if (r.viag) parti.push(`viaggio <b>${fmtH(r.viag)}</b>${r.viagPag !== r.viag ? ` (pagato ${fmtH(r.viagPag)})` : ''}`);
+    if (r.ass) parti.push(`${ASS_NOMI[r.assTipo]} <b>${fmtH(r.ass)}</b>`);
+    if (r.ind) parti.push(`indennità <b>${fmtEur(r.ind)}</b>`);
+    if (r.mancanti) parti.push(`<span style="color:#FF9C9C">mancano ${fmtH(r.mancanti)} alle ordinarie</span>`);
+    const det = [];
+    if (r.str1) det.push(`feriale prime 2 ore ${fmtH(r.str1)}`); if (r.str2) det.push(`feriale oltre ${fmtH(r.str2)}`);
+    if (r.sab1) det.push(`sabato prime 2 ore ${fmtH(r.sab1)}`); if (r.sab2) det.push(`sabato oltre ${fmtH(r.sab2)}`);
+    if (r.strNott) det.push(`notturno ${fmtH(r.strNott)}`); if (r.fest) det.push(`festivo ${fmtH(r.fest)}`); if (r.festNott) det.push(`festivo notturno ${fmtH(r.festNott)}`);
+    $('ed-anteprima').innerHTML = `<div class="pl">${parti.map(p => `<span>${p}</span>`).join('')}</div>${det.length ? `<div class="det">Straordinario: ${det.join(', ')}</div>` : ''}${stripHTML(e, false, null)}`;
+  }
+  function edSalva() {
+    const ds = $('ed-data').value;
+    if (!ds) { alert('Scegli una data'); return; }
+    const e = leggiEditor();
+    const t = orariAssoluti(e);
+    if ((e.inizio && !e.fine) || (!e.inizio && e.fine)) {
+      if (num(e.oreLavoro) == null && !confirm('Hai indicato solo inizio o solo fine lavoro: le ore di lavoro risulteranno 0. Salvare lo stesso?')) return;
+    }
+    if (t.inizio != null && t.fine != null && t.fine - t.inizio > 20 * 60) { if (!confirm('Più di 20 ore tra inizio e fine lavoro: è corretto?')) return; }
+    const vuoto = !e.inizio && !e.fine && !e.partenza && !e.arrivo && num(e.oreLavoro) == null && num(e.oreViaggio) == null && !e.assTipo && !e.note && !e.localita && !(num(e.km)) && e.trasferta === 'no';
+    if (vuoto) { alert('Il giorno è vuoto: inserisci orari, ore o un\'assenza.'); return; }
+    if (db.giorni[ds] && ds !== edOrig && !confirm(`Il ${dataIt(ds)} è già registrato. Sostituirlo?`)) return;
+    if (edOrig && edOrig !== ds) delete db.giorni[edOrig];
+    e.fonte = (db.giorni[ds] && db.giorni[ds].fonte === 'cronometro' && edOrig === ds) ? 'cronometro*' : 'manuale';
+    e.agg = new Date().toISOString();
+    db.giorni[ds] = e;
+    if (db.live && db.live.data === ds && db.live.stato === 'FINITO') {
+      Object.assign(db.live, { localita: e.localita, km: e.km, trasferta: e.trasferta, indImporto: e.indImporto, note: e.note });
+    }
+    salvaDb(); aggiornaDatalist();
+    chiudiModal('modal-editor');
+    toast('Giorno salvato');
+    const d = parseD(ds); meseSel = { y: d.getFullYear(), m: d.getMonth() };
+    refreshCorrente();
+  }
+  function edElimina() {
+    if (!edOrig) return;
+    if (!confirm(`Eliminare il ${dataIt(edOrig)}?`)) return;
+    delete db.giorni[edOrig];
+    if (db.live && db.live.data === edOrig && db.live.stato === 'FINITO') db.live = nuovoLive();
+    salvaDb(); chiudiModal('modal-editor'); toast('Giorno eliminato', 'trash'); refreshCorrente();
+  }
+  function chiudiEditor() { chiudiModal('modal-editor'); }
+  function refreshCorrente() { vai(tabCorrente); }
+
+  // Assenza su più giorni
+  function apriAssenzaMultipla() {
+    const { y, m } = meseSel;
+    const base = (y === new Date().getFullYear() && m === new Date().getMonth()) ? oggiStr() : `${y}-${pad(m + 1)}-01`;
+    $('mu-da').value = base; $('mu-a').value = base;
+    $('mu-sovrascrivi').checked = false;
+    apriModal('modal-multi');
+  }
+  function salvaAssenzaMultipla() {
+    const da = $('mu-da').value, a = $('mu-a').value, tipo = $('mu-tipo').value;
+    if (!da || !a || a < da) { alert('Controlla le date: «Al» deve venire dopo «Dal».'); return; }
+    let n = 0, saltati = 0;
+    for (let d = parseD(da); dStr(d) <= a; d.setDate(d.getDate() + 1)) {
+      const ds = dStr(d);
+      if (tipoGiorno(ds) !== 'lav') continue;
+      if (db.giorni[ds] && !$('mu-sovrascrivi').checked) { saltati++; continue; }
+      db.giorni[ds] = { assTipo: tipo, assOre: imp().oreGiorno, trasferta: 'no', fonte: 'manuale', agg: new Date().toISOString() };
+      n++;
+    }
+    salvaDb(); chiudiModal('modal-multi');
+    toast(`${n} giorni segnati come ${ASS_NOMI[tipo]}${saltati ? `, ${saltati} già compilati lasciati com'erano` : ''}`);
+    refreshCorrente();
+  }
+
+  // =============================================================
+  // RIEPILOGO
+  // =============================================================
+  const kv = (k, v, cls = '') => `<div class="r ${cls}"><span class="k">${k}</span><span class="v">${v}</span></div>`;
+
+  function renderRiepilogo() {
+    const { y, m } = meseSel;
+    const T = calcolaMese(y, m);
+    const P = stimaPaga(T);
+    $('riep-stats').innerHTML = `
+      <div><div class="k">Giorni lavorati</div><div class="v">${T.giorniLav}</div></div>
+      <div><div class="k">Straordinario</div><div class="v amber">${fmtH(T.straord)}</div></div>
+      <div><div class="k">Netto stimato</div><div class="v green">${fmtNum(Math.round(P.netto))} €</div></div>`;
+
+    const assTot = Object.values(T.ass).reduce((s, x) => s + x, 0);
+    const parti = [['Ordinarie', T.ord, 'var(--cobalt)'], ['Straordinario', T.straord, 'var(--amber)'], ['Viaggio', T.viag, 'var(--indigo)'], ['Assenze', assTot, 'var(--green)']];
+    const tot = parti.reduce((s, p) => s + p[1], 0);
+    $('riep-compo').innerHTML = tot
+      ? `<div class="bar">${parti.filter(p => p[1]).map(p => `<i style="width:${(p[1] / tot * 100).toFixed(2)}%;background:${p[2]}"></i>`).join('')}</div>
+         <div class="lg">${parti.filter(p => p[1]).map(p => `<span style="--c:${p[2]}">${p[0]} <b>${fmtH(p[1])}</b></span>`).join('')}</div>`
+      : `<div class="empty" style="padding:0">Nessuna ora registrata in questo mese.</div>`;
+
+    $('riep-ore').innerHTML =
+      kv('Ore di lavoro', fmtH(T.lav)) +
+      kv('Ordinarie', fmtH(T.ord), 'sub') +
+      kv('Straordinarie', fmtH(T.straord), 'sub') +
+      kv('Ore notturne', fmtH(T.notte)) +
+      kv('Ore di viaggio', fmtH(T.viag)) +
+      (T.festiviPagati ? kv('Festività infrasettimanali', T.festiviPagati) : '') +
+      (T.mancanti ? kv('Ore sotto l\'orario normale', `<span style="color:var(--red)">${fmtH(T.mancanti)}</span>`) : '') +
+      (T.giorniMancanti.length ? kv('Giorni lavorativi vuoti', `<span style="color:var(--amber)">${T.giorniMancanti.length}</span>`) : '');
+
+    const s = [];
+    P.voci.slice(0, 8).forEach(v => { if (v.min) s.push(kv(`${v.k} <em>+${v.p}%</em>`, fmtH(v.min))); });
+    $('riep-straord').innerHTML = s.length ? s.join('') : '<div class="empty">Nessuno straordinario in questo mese.</div>';
+
+    $('riep-trasferte').innerHTML =
+      kv('Giorni con indennità', T.giorniTrasf) +
+      (T.pernotti ? kv('Con pernotto', T.pernotti, 'sub') : '') +
+      kv('Indennità di trasferta', fmtEur(T.ind)) +
+      kv('Km percorsi', fmtNum(T.km) + ' km') +
+      (imp().euroKm ? kv(`Rimborso km <em>${fmtEur(imp().euroKm)} al km</em>`, fmtEur(T.rimbKm)) : '') +
+      kv(`Ore di viaggio pagate <em>al ${imp().viaggioPerc}%</em>`, fmtH(T.viagPag));
+
+    const a = [];
+    Object.keys(ASS_NOMI).forEach(k => { if (T.ass[k]) a.push(kv(ASS_NOMI[k], fmtH(T.ass[k]) + (k === 'malattia' ? ` (${T.giorniMalattia} gg)` : ''))); });
+    $('riep-assenze').innerHTML = a.length ? a.join('') : '<div class="empty">Nessuna assenza in questo mese.</div>';
+
+    let p = '';
+    P.base.forEach(v => { p += kv(v.min ? `${v.k} <em>${fmtH(v.min)}</em>` : v.k, fmtEur(v.eur)); });
+    P.voci.forEach(v => { if (v.min) p += kv(`${v.k} <em>${fmtH(v.min)} ${v.pAss ? 'al ' + v.p : '+' + v.p}%</em>`, fmtEur(v.eur)); });
+    if (P.trattenuta) p += kv('Permessi non retribuiti', '− ' + fmtEur(P.trattenuta));
+    p += kv('Imponibile stimato', fmtEur(P.imponibile), 'tot');
+    p += kv(`Trattenute <em>${fmtNum(imp().aliquota, 1)}% contributi e IRPEF</em>`, '− ' + fmtEur(P.trattenute), 'sub');
+    if (P.crediti) p += kv('Crediti fiscali', '+ ' + fmtEur(P.crediti), 'sub');
+    if (T.ind) p += kv('Indennità di trasferta <em>esente</em>', '+ ' + fmtEur(T.ind), 'sub');
+    if (T.rimbKm) p += kv('Rimborso km', '+ ' + fmtEur(T.rimbKm), 'sub');
+    p += kv('Netto in busta stimato', fmtEur(P.netto), 'big');
+    $('riep-paga').innerHTML = p;
+    $('riep-paga-nota').textContent = `Paga oraria ${fmtEur(P.h).replace(/,(\d\d)\s/, ',$1 ')} (${pagaOraria().toLocaleString('it-IT', { maximumFractionDigits: 5 })} €). È una stima per confrontare la busta: ratei, addizionali, conguagli e malattia a carico INPS non sono considerati${T.ass.malattia ? ', e le ore di malattia sono escluse dal calcolo' : ''}.`;
+
+    const S = saldiAnno(y, m);
+    const og = imp().oreGiorno || 8;
+    $('saldi-anno').textContent = `${y}, fino a ${MESI[m]}`;
+    $('riep-saldi').innerHTML =
+      kv(S.assuntoQuest ? 'Ferie all\'assunzione' : 'Ferie residue al 1° gennaio', fmtH(S.ferieIniz * 60)) +
+      kv(`Maturate <em>${S.mesi} ${S.mesi === 1 ? 'mese' : 'mesi'}</em>`, '+ ' + fmtH(S.ferieMat * 60), 'sub') + kv('Godute', '− ' + fmtH(S.ferieGod * 60), 'sub') +
+      kv(`Ferie residue <em>${fmtNum(S.ferieRes / og, 2)} giorni</em>`, fmtH(S.ferieRes * 60), 'tot') +
+      (S.ferieProg ? kv('Già segnate nei mesi successivi', fmtH(S.ferieProg * 60), 'sub') : '') +
+      kv(S.assuntoQuest ? 'ROL/PAR all\'assunzione' : 'ROL/PAR residui al 1° gennaio', fmtH(S.parIniz * 60)) +
+      kv('Maturati', '+ ' + fmtH(S.parMat * 60), 'sub') + kv('Goduti', '− ' + fmtH(S.parGod * 60), 'sub') +
+      kv('ROL/PAR residui', fmtH(S.parRes * 60), 'tot') +
+      (S.parProg ? kv('Già segnati nei mesi successivi', fmtH(S.parProg * 60), 'sub') : '');
+    const si = db.saldi[y] || {};
+    $('saldo-ferie').value = si.ferie != null ? si.ferie : '';
+    $('saldo-par').value = si.par != null ? si.par : '';
+  }
+  function salvaSaldiIniziali() {
+    const y = meseSel.y;
+    db.saldi[y] = { ferie: num($('saldo-ferie').value) || 0, par: num($('saldo-par').value) || 0 };
+    salvaDb(); renderRiepilogo(); toast('Residui salvati');
+  }
+
+  // =============================================================
+  // ESPORTAZIONI (PDF, CSV, BACKUP)
+  // =============================================================
+  function caricaScript(src) {
+    return new Promise((ok, ko) => {
+      if (document.querySelector(`script[src="${src}"]`)) return ok();
+      const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = ko; document.head.appendChild(s);
+    });
+  }
+  async function esportaPDF() {
+    try {
+      await caricaScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+      await caricaScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js');
+    } catch (e) { alert('Per creare il PDF la prima volta serve la connessione internet. Dopo funziona anche offline.'); return; }
+    const { jsPDF } = window.jspdf;
+    const { y, m } = meseSel;
+    const T = calcolaMese(y, m), P = stimaPaga(T), I = imp();
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const W = doc.internal.pageSize.getWidth();
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(15);
+    doc.text(`Riepilogo ore – ${MESI[m].charAt(0).toUpperCase() + MESI[m].slice(1)} ${y}`, 12, 14);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5);
+    doc.text(`${I.nome ? I.nome + ' – ' : ''}Generato il ${new Date().toLocaleDateString('it-IT')} con Segna Ore ${APP_VERSION}`, 12, 20);
+
+    const corpo = [];
+    T.righe.forEach(({ ds, e, r }) => {
+      if (!e) return;
+      const d = parseD(ds);
+      const orari = [e.partenza ? 'P ' + e.partenza : '', (e.inizio || e.fine) ? `${e.inizio || '?'}-${e.fine || '?'}` : (num(e.oreLavoro) != null ? 'a mano' : ''), e.arrivo ? 'R ' + e.arrivo : ''].filter(Boolean).join('  ');
+      corpo.push([
+        `${pad(d.getDate())} ${GG[d.getDay()]}${r.tipo === 'fest' ? ' F' : ''}`,
+        e.localita || '', orari, e.pausa ? e.pausa + "'" : '',
+        r.lav ? fmtH(r.lav) : '', r.ord ? fmtH(r.ord) : '', r.straord ? fmtH(r.straord) : '', r.notte ? fmtH(r.notte) : '',
+        r.viag ? fmtH(r.viag) : '', r.assTipo ? `${ASS_NOMI[r.assTipo]} ${fmtH(r.ass)}` : '',
+        r.km ? fmtNum(r.km) : '', r.ind ? fmtEur(r.ind) + (r.pernotto ? ' (P)' : '') : '', e.note || ''
+      ]);
+    });
+    corpo.push(['TOTALE', '', '', '', fmtH(T.lav), fmtH(T.ord), fmtH(T.straord), fmtH(T.notte), fmtH(T.viag), '', fmtNum(T.km), fmtEur(T.ind), '']
+      .map(c => ({ content: c, styles: { fontStyle: 'bold' } })));
+
+    doc.autoTable({
+      startY: 25, margin: { left: 12, right: 12 },
+      head: [['Giorno', 'Località', 'Orari', 'Pausa', 'Lavoro', 'Ordin.', 'Straord.', 'Nott.', 'Viaggio', 'Assenza', 'Km', 'Indennità', 'Note']],
+      body: corpo, theme: 'grid',
+      styles: { fontSize: 8, cellPadding: 1.4, valign: 'middle' },
+      headStyles: { fillColor: [24, 32, 49], textColor: 255, fontStyle: 'bold' },
+      columnStyles: { 0: { cellWidth: 16 }, 1: { cellWidth: 38 }, 2: { cellWidth: 40 }, 3: { cellWidth: 11, halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' }, 6: { halign: 'right' }, 7: { halign: 'right' }, 8: { halign: 'right' }, 10: { halign: 'right' }, 11: { halign: 'right' }, 12: { cellWidth: 40 } }
+    });
+
+    let yy = doc.lastAutoTable.finalY + 8;
+    if (yy > 140) { doc.addPage(); yy = 15; }
+    const sx = [['Voce', 'Ore', 'Importo']];
+    P.base.forEach(v => sx.push([v.k, v.min ? fmtH(v.min) : '', fmtEur(v.eur)]));
+    P.voci.forEach(v => { if (v.min) sx.push([`${v.k} (${v.pAss ? '' : '+'}${v.p}%)`, fmtH(v.min), fmtEur(v.eur)]); });
+    if (P.trattenuta) sx.push(['Permessi non retribuiti', fmtH(T.ass.nonretr), '- ' + fmtEur(P.trattenuta)]);
+    sx.push(['Imponibile stimato', '', fmtEur(P.imponibile)]);
+    sx.push([`Trattenute (${fmtNum(I.aliquota, 1)}%)`, '', '- ' + fmtEur(P.trattenute)]);
+    if (P.crediti) sx.push(['Crediti fiscali', '', '+ ' + fmtEur(P.crediti)]);
+    if (T.ind) sx.push([`Indennità trasferta (${T.giorniTrasf} gg)`, '', '+ ' + fmtEur(T.ind)]);
+    if (T.rimbKm) sx.push([`Rimborso km (${fmtNum(T.km)} km)`, '', '+ ' + fmtEur(T.rimbKm)]);
+    sx.push(['Netto in busta stimato', '', fmtEur(P.netto)]);
+    doc.autoTable({
+      startY: yy, margin: { left: 12 }, tableWidth: 150, head: [sx[0]], body: sx.slice(1), theme: 'striped',
+      styles: { fontSize: 8.5, cellPadding: 1.6 }, headStyles: { fillColor: [23, 148, 95] },
+      columnStyles: { 1: { halign: 'right', cellWidth: 20 }, 2: { halign: 'right', cellWidth: 30 } }
+    });
+    const ax = [['Assenze e saldi', 'Ore']];
+    Object.keys(ASS_NOMI).forEach(k => { if (T.ass[k]) ax.push([ASS_NOMI[k], fmtH(T.ass[k])]); });
+    const S = saldiAnno(y, m);
+    ax.push(['Ferie residue a fine mese', fmtH(S.ferieRes * 60)]);
+    ax.push(['ROL/PAR residui a fine mese', fmtH(S.parRes * 60)]);
+    doc.autoTable({
+      startY: yy, margin: { left: 170 }, tableWidth: W - 182, head: [ax[0]], body: ax.slice(1), theme: 'striped',
+      styles: { fontSize: 8.5, cellPadding: 1.6 }, headStyles: { fillColor: [47, 91, 234] }, columnStyles: { 1: { halign: 'right' } }
+    });
+    doc.setFontSize(7.5); doc.setTextColor(120);
+    doc.text('Stima indicativa per il confronto con la busta paga. P = partenza dalla sede, R = rientro in sede, F = festivo, (P) = con pernotto.', 12, doc.internal.pageSize.getHeight() - 8);
+    doc.save(`ore_${y}-${pad(m + 1)}.pdf`);
+  }
+
+  function scaricaFile(nome, contenuto, tipo) {
+    const blob = new Blob([contenuto], { type: tipo });
+    const file = (typeof File !== 'undefined') ? new File([blob], nome, { type: tipo }) : null;
+    if (file && navigator.canShare && navigator.canShare({ files: [file] }) && /Android|iPhone|iPad/i.test(navigator.userAgent)) {
+      navigator.share({ files: [file], title: nome }).catch(() => {});
+      return;
+    }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = nome;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  }
+
+  function esportaCSV() {
+    const { y, m } = meseSel;
+    const T = calcolaMese(y, m);
+    const n = min => (min / 60).toFixed(2).replace('.', ',');
+    const q = s => `"${String(s || '').replace(/"/g, '""')}"`;
+    const righe = [['Data', 'Giorno', 'Tipo giorno', 'Località', 'Partenza', 'Inizio', 'Fine', 'Rientro sede', 'Pausa min', 'Ore lavoro', 'Ordinarie', 'Straord. feriale 2h', 'Straord. feriale oltre', 'Sabato 2h', 'Sabato oltre', 'Straord. notturno', 'Festivo', 'Festivo notturno', 'Notturno in orario', 'Ore viaggio', 'Viaggio pagato', 'Assenza', 'Ore assenza', 'Km', 'Trasferta', 'Indennità €', 'Note'].join(';')];
+    T.righe.forEach(({ ds, e, r }) => {
+      if (!e) return;
+      const d = parseD(ds);
+      righe.push([dataIt(ds), GG[d.getDay()], { lav: 'lavorativo', sab: 'libero', fest: 'festivo' }[r.tipo], q(e.localita), e.partenza || '', e.inizio || '', e.fine || '', e.arrivo || '', e.pausa || '',
+        n(r.lav), n(r.ord), n(r.str1), n(r.str2), n(r.sab1), n(r.sab2), n(r.strNott), n(r.fest), n(r.festNott), n(r.ordNott), n(r.viag), n(r.viagPag),
+        r.assTipo ? ASS_NOMI[r.assTipo] : '', r.ass ? n(r.ass) : '', r.km || '', e.trasferta || 'no', r.ind ? r.ind.toFixed(2).replace('.', ',') : '', q(e.note)].join(';'));
+    });
+    scaricaFile(`ore_${y}-${pad(m + 1)}.csv`, '﻿' + righe.join('\r\n'), 'text/csv;charset=utf-8');
+  }
+
+  function esportaBackup() {
+    const dati = JSON.stringify({ app: 'segna-ore', versioneApp: APP_VERSION, esportato: new Date().toISOString(), giorni: db.giorni, saldi: db.saldi, imp: db.imp }, null, 1);
+    scaricaFile(`segna-ore-backup_${oggiStr()}.json`, dati, 'application/json');
+    db.ultimoBackup = new Date().toISOString(); salvaDb();
+    if (tabCorrente === 'imp') renderImpostazioni();
+    renderBannerBackup();
+  }
+  function importaBackup(input) {
+    const f = input.files && input.files[0];
+    if (!f) return;
+    const rd = new FileReader();
+    rd.onload = () => {
+      try {
+        const d = JSON.parse(rd.result);
+        if (!d || typeof d.giorni !== 'object') throw new Error('formato');
+        const nIn = Object.keys(d.giorni).length, nQui = Object.keys(db.giorni).length;
+        const sostituisci = nQui === 0 || confirm(`Il backup contiene ${nIn} giorni, qui ne hai ${nQui}.\n\nOK = sostituisci tutto con il backup\nAnnulla = unisci (i giorni del backup prevalgono)`);
+        if (sostituisci) { db.giorni = d.giorni; db.saldi = d.saldi || {}; }
+        else { Object.assign(db.giorni, d.giorni); Object.assign(db.saldi, d.saldi || {}); }
+        if (d.imp) db.imp = unisciImp(d.imp);
+        salvaDb(); applicaTema(); aggiornaDatalist(); toast(`Backup importato: ${nIn} giorni`); refreshCorrente();
+      } catch (e) { alert('Questo file non è un backup di Segna Ore. Scegli il file .json esportato dall\'app.'); }
+      input.value = '';
+    };
+    rd.readAsText(f);
+  }
+  function cancellaTutto() {
+    if (!confirm('Cancellare tutti i giorni registrati su questo telefono?')) return;
+    if (prompt('Scrivi CANCELLA per confermare') !== 'CANCELLA') return;
+    db.giorni = {}; db.saldi = {}; db.live = null; salvaDb(); toast('Dati cancellati', 'trash'); refreshCorrente();
+  }
+  function renderBannerBackup() {
+    const n = Object.keys(db.giorni).length;
+    const b = $('banner-backup');
+    const L = db.live;
+    if (L && L.data !== oggiStr() && L.stato !== 'FINITO' && L.stato !== 'PRONTO') return; // c'è l'avviso del cronometro
+    const giorni = db.ultimoBackup ? (Date.now() - new Date(db.ultimoBackup)) / 86400000 : Infinity;
+    if (n >= 5 && giorni > 30) {
+      b.innerHTML = `<div class="note n-amber" style="border-radius:14px;padding:12px 14px;display:flex;gap:10px;align-items:center;font-size:14px;font-weight:600">${ico('save')}<span style="flex:1">${db.ultimoBackup ? 'Ultimo backup più di un mese fa.' : 'Nessun backup finora.'} I dati sono solo su questo telefono.</span><button class="btn sm warn" style="width:auto;min-height:38px;padding:6px 12px;font-size:13.5px" onclick="esportaBackup()">Esporta</button></div>`;
+      b.classList.remove('hidden');
+    } else b.classList.add('hidden');
+  }
+
+  // =============================================================
+  // IMPOSTAZIONI
+  // =============================================================
+  function getImp(path) { return path.split('.').reduce((o, k) => o == null ? o : o[k], db.imp); }
+  function setImp(path, val) { const ks = path.split('.'); let o = db.imp; while (ks.length > 1) o = o[ks.shift()]; o[ks[0]] = val; }
+
+  function renderImpostazioni() {
+    const box = $('imp-giorni');
+    box.innerHTML = [1, 2, 3, 4, 5, 6, 0].map(g => `<label><input type="checkbox" value="${g}" ${imp().giorniLav.includes(g) ? 'checked' : ''}><span>${GG[g]}</span></label>`).join('');
+    box.querySelectorAll('input').forEach(c => c.onchange = () => {
+      db.imp.giorniLav = [...box.querySelectorAll('input:checked')].map(x => Number(x.value));
+      salvaDb();
+    });
+    document.querySelectorAll('[data-imp]').forEach(el => {
+      const path = el.dataset.imp, v = getImp(path);
+      if (el.type === 'checkbox') el.checked = !!v; else el.value = v == null ? '' : v;
+      el.onchange = () => {
+        const val = el.type === 'checkbox' ? el.checked : (el.type === 'number' ? (num(el.value) != null ? num(el.value) : 0) : el.value);
+        setImp(path, val); salvaDb();
+        Object.keys(cacheFestivi).forEach(k => delete cacheFestivi[k]);
+        aggiornaInfoImp();
+      };
+    });
+    document.querySelectorAll('#imp-modo input').forEach(r => {
+      r.checked = r.value === imp().modoPaga;
+      r.onchange = () => { db.imp.modoPaga = r.value; salvaDb(); aggiornaInfoImp(); };
+    });
+    document.querySelectorAll('#imp-tema input').forEach(r => {
+      r.checked = r.value === (imp().tema || 'auto');
+      r.onchange = () => { db.imp.tema = r.value; salvaDb(); applicaTema(); };
+    });
+    aggiornaInfoImp();
+    $('imp-backup-info').textContent = db.ultimoBackup ? `Ultimo backup: ${new Date(db.ultimoBackup).toLocaleString('it-IT')}` : 'Nessun backup esportato finora.';
+    const n = Object.keys(db.giorni).length;
+    let kb = 0; try { kb = Math.round((localStorage.getItem(LS_KEY) || '').length / 1024); } catch (e) {}
+    $('imp-storage-info').textContent = `${n} giorni registrati, ${kb} KB occupati.`;
+  }
+  function aggiornaInfoImp() {
+    const ora = imp().modoPaga === 'ora';
+    $('imp-wrap-ora').classList.toggle('hidden', !ora);
+    $('imp-wrap-mese').classList.toggle('hidden', ora);
+    $('imp-wrap-div').classList.toggle('hidden', ora);
+    $('imp-modo-help').textContent = ora
+      ? 'Come in busta (operaio): ore ordinarie, ferie, permessi e festività moltiplicate per la paga oraria.'
+      : `Stipendio fisso: paga oraria per gli straordinari ${pagaOraria().toLocaleString('it-IT', { maximumFractionDigits: 5 })} €.`;
+  }
+
+  // =============================================================
+  // AVVIO
+  // =============================================================
+  function iconeStatiche() {
+    const tabs = { oggi: ['clock', 'Oggi'], giorni: ['cal', 'Giorni'], riepilogo: ['chart', 'Riepilogo'], imp: ['sliders', 'Impostazioni'] };
+    document.querySelectorAll('nav.tabs button').forEach(b => { const [i, t] = tabs[b.dataset.tab]; b.innerHTML = lbl(i, t); });
+    document.querySelectorAll('[data-ico]').forEach(b => b.innerHTML = ico(b.dataset.ico));
+    $('btn-correggi-live').innerHTML = lbl('edit', 'Correggi gli orari');
+    $('btn-azzera-live').innerHTML = lbl('x', 'Azzera');
+    document.querySelector('#view-giorni .g2 .btn:not(.soft)').innerHTML = lbl('plus', 'Aggiungi giorno');
+    document.querySelector('#view-giorni .g2 .btn.soft').innerHTML = lbl('sun', 'Ferie e assenze');
+    $('btn-pdf').innerHTML = lbl('file', 'PDF del mese');
+    $('btn-csv').innerHTML = lbl('down', 'CSV per Excel');
+    $('btn-backup').innerHTML = lbl('down', 'Esporta backup');
+    $('btn-import').innerHTML = lbl('up', 'Importa backup');
+    $('btn-cancella').innerHTML = lbl('trash', 'Cancella tutti i dati');
+    $('btn-ed-std').innerHTML = lbl('bolt', 'Giornata tipo');
+    $('btn-ed-copia').innerHTML = lbl('copy', 'Copia ultimo');
+    $('btn-ed-salva').innerHTML = lbl('check', 'Salva giorno');
+    $('ed-elimina').innerHTML = lbl('trash', 'Elimina questo giorno');
+  }
+
+  applicaTema();
+  iconeStatiche();
+  salvaDb();
+  aggiornaDatalist();
+  renderOggi();
+  renderTop();
+  setInterval(() => {
+    if (tabCorrente === 'oggi' && db.live && ['ANDATA', 'LAVORO', 'PAUSA', 'RIENTRO'].includes(db.live.stato)) aggiornaTimer();
+  }, 15000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && tabCorrente === 'oggi') renderOggi(); });
+
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(err => console.log('Service worker non registrato:', err && err.message)));
+  }
+</script>
+</body>
+</html>
